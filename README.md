@@ -52,3 +52,17 @@ Rouge-2: 0.000000
 Rouge-L (Sentence Level): 0.066107
 Rouge-L (Summary Level): 0.039251
 ```
+```
+sumy_eval lex-rank art2_sum.txt --file=/Users/peli/forgit/nlp_project/data/art2.txt --format=plaintext
+Precision: 0.000000
+Recall: 0.000000
+F-score: 0.000000
+Cosine similarity: 0.721001
+Cosine similarity (document): 0.900767
+Unit overlap: 0.216450
+Unit overlap (document): 0.344426
+Rouge-1: 0.597403
+Rouge-2: 0.461538
+Rouge-L (Sentence Level): 0.103124
+Rouge-L (Summary Level): 0.004133
+```
