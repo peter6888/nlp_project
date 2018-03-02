@@ -11,6 +11,11 @@ cd data
 sh download.sh
 unzip finished_files.zip
 ```
+## Trial Run
+```
+cd src
+sh run_cmd.sh
+```
 ## Train base model from https://github.com/abisee/pointer-generator
 #### Pre-requirement, make sure have pyrouge installed
 ```
