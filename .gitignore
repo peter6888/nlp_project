@@ -5,3 +5,4 @@ data/*.zip
 data/finished_files/
 data/cnn_stories_tokenized/
 data/dm_stories_tokenized/
+.env/
