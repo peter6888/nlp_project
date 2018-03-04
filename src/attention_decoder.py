@@ -80,13 +80,14 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
       # reshape from (batch_size, attn_length) to (batch_size, attn_len, 1, 1)
       prev_coverage = tf.expand_dims(tf.expand_dims(prev_coverage,2),3)
 
-    def intra_temporal_attention(decoder_state, coverage=None):
+    def intra_temporal_attention(decoder_states, coverage=None):
       '''
       Intra Temporal Attention
       :param decoder_state:
       :param coverage: None
       :return:
       '''
+      decoder_state = decoder_states[-1]
       with variable_scope.variable_scope("Attention"):
         # Pass the decoder state through a linear layer (this is W_s s_t + b_attn in the paper)
         decoder_features = linear(decoder_state, attention_vec_size, True) # shape (batch_size, attention_vec_size)
@@ -100,8 +101,10 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
           return attn_dist / tf.reshape(masked_sums, [-1, 1]) # re-normalize
 
         # Intra-Temporal Attention
-        #W_e_attn = tf.get_variable('W_e_attn', shape=[decoder_state.shape()[1],encoder_states.shape()[0]], \
+        #tf.logging.info("decoder_state.get_shape() {}, encoder_states.get_shape {}".format(decoder_state.get_shape(), encoder_states.get_shape()))
+        #W_e_attn = tf.get_variable('W_e_attn', shape=[encoder_states.get_shape()[0]], \
         #                           intializer=tf.contrib.layers.xavier_initializer())
+        # To-do: to impplement the equation (2)
 
         # Calculate v^T tanh(W_h h_i + W_s s_t + b_attn)
         e = math_ops.reduce_sum(v * math_ops.tanh(encoder_features + decoder_features), [2, 3]) # calculate e
@@ -113,7 +116,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
 
       return context_vector, attn_dist, coverage
 
-    def attention(decoder_state, coverage=None):
+    def attention(decoder_states, coverage=None):
       """Calculate the context vector and attention distribution from the decoder state.
 
       Args:
@@ -125,6 +128,8 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
         attn_dist: attention distribution
         coverage: new coverage vector. shape (batch_size, attn_len, 1, 1)
       """
+      # pointer-generator model only need the last state
+      decoder_state = decoder_states[-1]
       with variable_scope.variable_scope("Attention"):
         # Pass the decoder state through a linear layer (this is W_s s_t + b_attn in the paper)
         decoder_features = linear(decoder_state, attention_vec_size, True) # shape (batch_size, attention_vec_size)
@@ -166,19 +171,22 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
       return context_vector, attn_dist, coverage
 
 
-    if attention_model==1:
+    if attention_model==1: #{0-Pointer-Attention, 1-Intra-Temporal-Attention, 2-.., 3-..}
       tf.logging.info("Using Intra Temporal Attention Model")
       attention = intra_temporal_attention
     outputs = []
     attn_dists = []
     p_gens = []
+    decoder_states = []
     state = initial_state
+    #don't need initial_state for caculation
+    #decoder_states.append(state)
     coverage = prev_coverage # initialize coverage to None or whatever was passed in
     context_vector = array_ops.zeros([batch_size, attn_size])
     context_vector.set_shape([None, attn_size])  # Ensure the second shape of attention vectors is set.
     if initial_state_attention: # true in decode mode
       # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
-      context_vector, _, coverage = attention(initial_state, coverage) # in decode mode, this is what updates the coverage vector
+      context_vector, _, coverage = attention([initial_state], coverage) # in decode mode, this is what updates the coverage vector
     for i, inp in enumerate(decoder_inputs):
       tf.logging.info("Adding attention_decoder timestep %i of %i", i, len(decoder_inputs))
       if i > 0:
@@ -193,12 +201,15 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
       # Run the decoder RNN cell. cell_output = decoder state
       cell_output, state = cell(x, state)
 
+      # Keep the decoder states
+      decoder_states.append(state)
+
       # Run the attention mechanism.
       if i == 0 and initial_state_attention:  # always true in decode mode
         with variable_scope.variable_scope(variable_scope.get_variable_scope(), reuse=True): # you need this because you've already run the initial attention(...) call
-          context_vector, attn_dist, _ = attention(state, coverage) # don't allow coverage to update
+          context_vector, attn_dist, _ = attention(decoder_states, coverage) # don't allow coverage to update
       else:
-        context_vector, attn_dist, coverage = attention(state, coverage)
+        context_vector, attn_dist, coverage = attention(decoder_states, coverage)
       attn_dists.append(attn_dist)
 
       # Calculate p_gen
