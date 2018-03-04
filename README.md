@@ -71,3 +71,16 @@ Rouge-2: 0.461538
 Rouge-L (Sentence Level): 0.103124
 Rouge-L (Summary Level): 0.004133
 ```
+### To-do List:
+Intra-Temporal Attention Decoder on Input Sequence
+Intra-Decoder Attention Decoder
+Token Generation and Pointer
+Sharing Decoder Weights
+
+### Group sharing resources
+Mendeley https://www.mendeley.com/newsfeed/#group:d48f9375-8628-3922-aa04-ac0f8832ae01
+Slack https://cs224nprojectteam.slack.com
+
+### Software Versions
+pip install tensorflow==1.4.1
+python 3.5.2 (or python 3.6.x)
