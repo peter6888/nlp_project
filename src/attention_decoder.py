@@ -112,20 +112,28 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
         # W_e_attn for h_d (hidden decoder vectors) and h_e (hidden encoder vectors)
         W_e_attn = tf.get_variable('W_e_attn', shape=(1, 1, encoder_hidden_vec_size, decoder_hidden_vec_size), \
                                   initializer=tf.contrib.layers.xavier_initializer())
-        # To-do: to impplement the equation (2)
         decoder_T = len(decoder_states)
         encoder_states_dot_W = nn_ops.conv2d(encoder_states, W_e_attn, [1, 1, 1, 1], "SAME") # shape (batch_size,?,1,decoder_hidden_vec_size)
         # caculate eti[decoder_T - 1], which is a list have length len(encoder_states)
         # tf.logging.info("encoder_states_dot_W.shape {}".format(encoder_states_dot_W.get_shape())) #encoder_states_dot_W.shape (16, ?, 1, 256)
         decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1), 1) # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
         e = math_ops.reduce_sum(decoder_state * encoder_states_dot_W, [2, 3])
-        # tf.logging.info("e.shape:{}".format(current_e.get_shape())) # (batch_size, ?decoder_states_length)
-        # Calculate v^T tanh(W_h h_i + W_s s_t + b_attn)
-        #e = math_ops.reduce_sum(v * math_ops.tanh(encoder_features + decoder_features), [2, 3]) # calculate e
-        #tf.logging.info("e.shape:{}".format(e.get_shape()))
+        if decoder_T==1:
+          e_prime = tf.exp(e)
+        else:
+          denominator = tf.reduce_sum(tf.exp(eti), axis=0)
+          e_prime = tf.divide(tf.exp(e), denominator)
+        #tf.logging.info("e_prime.shape:{}".format(e_prime.get_shape())) # (batch_size, ?)
+
+        # append to eti list after e_prime been calculated
+        eti.append(e)
+        #tf.logging.info("e.shape:{}".format(e.get_shape())) # e.shape:(batch_size, ?)
+
+        attn_score = tf.divide(e_prime, tf.reduce_sum(e_prime, axis=1, keep_dims=True))
+        #tf.logging.info("attn_score.shape:{}".format(attn_score.get_shape())) # attn_score.shape:(16, ?)
 
         # Calculate attention distribution
-        attn_dist = masked_attention(e)
+        attn_dist = masked_attention(attn_score) # To-do: 2.3 a different way to caculate the distribution
         context_vector = math_ops.reduce_sum(array_ops.reshape(attn_dist, [batch_size, -1, 1, 1]) * encoder_states, [1, 2]) # shape (batch_size, attn_size).
         context_vector = array_ops.reshape(context_vector, [-1, attn_size])
 
