@@ -57,6 +57,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
     attn_size = encoder_states.get_shape()[2].value # if this line fails, it's because the attention length isn't defined
 
     # Reshape encoder_states (need to insert a dim)
+    # actual shape of encoder_states.get_shape (16, ?, 1, 512)
     encoder_states = tf.expand_dims(encoder_states, axis=2) # now is shape (batch_size, attn_len, 1, attn_size)
 
     # To calculate attention, we calculate
@@ -87,8 +88,15 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
       :param coverage: None
       :return:
       '''
-      decoder_state = decoder_states[-1]
-      with variable_scope.variable_scope("Attention"):
+      decoder_state = decoder_states[-1][1] # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
+      batch_size = decoder_state.get_shape()[0].value
+      decoder_hidden_vec_size = decoder_state.get_shape()[1].value
+      encoder_hidden_vec_size = encoder_states.get_shape()[3].value
+      # tf.logging.info("hidden vector size - encoder:{}, decoder:{}".format(encoder_hidden_vec_size, decoder_hidden_vec_size)) # encoder:512, decoder:256
+
+      n_prime = len(decoder_inputs)
+      n = attn_size
+      with variable_scope.variable_scope("IT_Attention"):
         # Pass the decoder state through a linear layer (this is W_s s_t + b_attn in the paper)
         decoder_features = linear(decoder_state, attention_vec_size, True) # shape (batch_size, attention_vec_size)
         decoder_features = tf.expand_dims(tf.expand_dims(decoder_features, 1), 1) # reshape to (batch_size, 1, 1, attention_vec_size)
@@ -101,13 +109,20 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
           return attn_dist / tf.reshape(masked_sums, [-1, 1]) # re-normalize
 
         # Intra-Temporal Attention
-        #tf.logging.info("decoder_state.get_shape() {}, encoder_states.get_shape {}".format(decoder_state.get_shape(), encoder_states.get_shape()))
-        #W_e_attn = tf.get_variable('W_e_attn', shape=[encoder_states.get_shape()[0]], \
-        #                           intializer=tf.contrib.layers.xavier_initializer())
+        # W_e_attn for h_d (hidden decoder vectors) and h_e (hidden encoder vectors)
+        W_e_attn = tf.get_variable('W_e_attn', shape=(1, 1, encoder_hidden_vec_size, decoder_hidden_vec_size), \
+                                  initializer=tf.contrib.layers.xavier_initializer())
         # To-do: to impplement the equation (2)
-
+        decoder_T = len(decoder_states)
+        encoder_states_dot_W = nn_ops.conv2d(encoder_states, W_e_attn, [1, 1, 1, 1], "SAME") # shape (batch_size,?,1,decoder_hidden_vec_size)
+        # caculate eti[decoder_T - 1], which is a list have length len(encoder_states)
+        # tf.logging.info("encoder_states_dot_W.shape {}".format(encoder_states_dot_W.get_shape())) #encoder_states_dot_W.shape (16, ?, 1, 256)
+        decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1), 1) # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
+        e = math_ops.reduce_sum(decoder_state * encoder_states_dot_W, [2, 3])
+        # tf.logging.info("e.shape:{}".format(current_e.get_shape())) # (batch_size, ?decoder_states_length)
         # Calculate v^T tanh(W_h h_i + W_s s_t + b_attn)
-        e = math_ops.reduce_sum(v * math_ops.tanh(encoder_features + decoder_features), [2, 3]) # calculate e
+        #e = math_ops.reduce_sum(v * math_ops.tanh(encoder_features + decoder_features), [2, 3]) # calculate e
+        #tf.logging.info("e.shape:{}".format(e.get_shape()))
 
         # Calculate attention distribution
         attn_dist = masked_attention(e)
@@ -174,6 +189,8 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
     if attention_model==1: #{0-Pointer-Attention, 1-Intra-Temporal-Attention, 2-.., 3-..}
       tf.logging.info("Using Intra Temporal Attention Model")
       attention = intra_temporal_attention
+      eti = [] #The eti in equation (1), eti is a list length of decoder_steps_length, and each eti[t] is a list of length encoder_steps_length
+
     outputs = []
     attn_dists = []
     p_gens = []
@@ -266,6 +283,11 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
     else:
       total_arg_size += shape[1]
 
+  #tf.logging.info("Linear Matrix [total_arg_size:{},output_size:{}]".format(total_arg_size, output_size))
+  '''
+  INFO:tensorflow:Linear Matrix [total_arg_size:640,output_size:128]
+  INFO:tensorflow:Linear Matrix [total_arg_size:512,output_size:512]
+  '''
   # Now the computation.
   with tf.variable_scope(scope or "Linear"):
     matrix = tf.get_variable("Matrix", [total_arg_size, output_size])
