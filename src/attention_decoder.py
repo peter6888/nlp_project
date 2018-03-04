@@ -1,6 +1,7 @@
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 # Modifications Copyright 2017 Abigail See
-#
+# Modifications Copyright 2018 Peter Li
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -16,6 +17,9 @@
 
 """This file defines the decoder"""
 
+import argparse
+import sys
+import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.ops import array_ops
@@ -24,7 +28,7 @@ from tensorflow.python.ops import math_ops
 
 # Note: this function is based on tf.contrib.legacy_seq2seq_attention_decoder, which is now outdated.
 # In the future, it would make more sense to write variants on the attention mechanism using the new seq2seq library for tensorflow 1.0: https://www.tensorflow.org/api_guides/python/contrib.seq2seq#Attention
-def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding_mask, cell, initial_state_attention=False, pointer_gen=True, use_coverage=False, prev_coverage=None):
+def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding_mask, cell, initial_state_attention=False, pointer_gen=True, use_coverage=False, prev_coverage=None, attention_model=1):
   """
   Args:
     decoder_inputs: A list of 2D Tensors [batch_size x input_size].
@@ -75,6 +79,39 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
     if prev_coverage is not None: # for beam search mode with coverage
       # reshape from (batch_size, attn_length) to (batch_size, attn_len, 1, 1)
       prev_coverage = tf.expand_dims(tf.expand_dims(prev_coverage,2),3)
+
+    def intra_temporal_attention(decoder_state, coverage=None):
+      '''
+      Intra Temporal Attention
+      :param decoder_state:
+      :param coverage: None
+      :return:
+      '''
+      with variable_scope.variable_scope("Attention"):
+        # Pass the decoder state through a linear layer (this is W_s s_t + b_attn in the paper)
+        decoder_features = linear(decoder_state, attention_vec_size, True) # shape (batch_size, attention_vec_size)
+        decoder_features = tf.expand_dims(tf.expand_dims(decoder_features, 1), 1) # reshape to (batch_size, 1, 1, attention_vec_size)
+
+        def masked_attention(e):
+          """Take softmax of e then apply enc_padding_mask and re-normalize"""
+          attn_dist = nn_ops.softmax(e) # take softmax. shape (batch_size, attn_length)
+          attn_dist *= enc_padding_mask # apply mask
+          masked_sums = tf.reduce_sum(attn_dist, axis=1) # shape (batch_size)
+          return attn_dist / tf.reshape(masked_sums, [-1, 1]) # re-normalize
+
+        # Intra-Temporal Attention
+        #W_e_attn = tf.get_variable('W_e_attn', shape=[decoder_state.shape()[1],encoder_states.shape()[0]], \
+        #                           intializer=tf.contrib.layers.xavier_initializer())
+
+        # Calculate v^T tanh(W_h h_i + W_s s_t + b_attn)
+        e = math_ops.reduce_sum(v * math_ops.tanh(encoder_features + decoder_features), [2, 3]) # calculate e
+
+        # Calculate attention distribution
+        attn_dist = masked_attention(e)
+        context_vector = math_ops.reduce_sum(array_ops.reshape(attn_dist, [batch_size, -1, 1, 1]) * encoder_states, [1, 2]) # shape (batch_size, attn_size).
+        context_vector = array_ops.reshape(context_vector, [-1, attn_size])
+
+      return context_vector, attn_dist, coverage
 
     def attention(decoder_state, coverage=None):
       """Calculate the context vector and attention distribution from the decoder state.
@@ -128,6 +165,10 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
 
       return context_vector, attn_dist, coverage
 
+
+    if attention_model==1:
+      tf.logging.info("Using Intra Temporal Attention Model")
+      attention = intra_temporal_attention
     outputs = []
     attn_dists = []
     p_gens = []
