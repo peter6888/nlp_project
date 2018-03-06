@@ -1,0 +1,23 @@
+INFO:tensorflow:Finished reading dataset in single_pass mode.
+INFO:tensorflow:Decoder has finished reading dataset for single_pass.
+INFO:tensorflow:Output has been saved in log/intra_temp/decode_test_400maxenc_4beam_35mindec_100maxdec_ckpt-5665/reference and log/intra_temp/decode_test_400maxenc_4beam_35mindec_100maxdec_ckpt-5665/decoded. Now starting ROUGE eval...
+Traceback (most recent call last):
+  File "run_summarization.py", line 331, in <module>
+    tf.app.run()
+  File "/anaconda/envs/py35/lib/python3.5/site-packages/tensorflow/python/platform/app.py", line 48, in run
+    _sys.exit(main(_sys.argv[:1] + flags_passthrough))
+  File "run_summarization.py", line 326, in main
+    decoder.decode() # decode indefinitely (unless single_pass=True, in which case deocde the dataset exactly once)
+  File "/home/cs224n-team/notebooks/nlp_project/src/decode.py", line 87, in decode
+    results_dict = rouge_eval(self._rouge_ref_dir, self._rouge_dec_dir)
+  File "/home/cs224n-team/notebooks/nlp_project/src/decode.py", line 210, in rouge_eval
+    r = pyrouge.Rouge155()
+  File "/anaconda/envs/py35/lib/python3.5/site-packages/pyrouge/Rouge155.py", line 88, in __init__
+    self.__set_rouge_dir(rouge_dir)
+  File "/anaconda/envs/py35/lib/python3.5/site-packages/pyrouge/Rouge155.py", line 402, in __set_rouge_dir
+    self._home_dir = self.__get_rouge_home_dir_from_settings()
+  File "/anaconda/envs/py35/lib/python3.5/site-packages/pyrouge/Rouge155.py", line 416, in __get_rouge_home_dir_from_settings
+    with open(self._settings_file) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/home/cs224n-team/.pyrouge/settings.ini'
+cs224n-team@cs224n-dev:~/notebooks/nlp_project/src$
+
