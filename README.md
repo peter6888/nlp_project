@@ -100,6 +100,6 @@ home_dir = /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5
 Maybe want to re-build the .db for some reason
 ```
 cd /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5/data/WordNet-2.0-Exceptions/
-perl buildExeptionDB.pl /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5/data/WordNet-2.0-Exceptions db /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5/data/WordNet-2.0.exe.db
+perl buildExeptionDB.pl /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5/data/WordNet-2.0-Exceptions db /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5/data/WordNet-2.0.exc.db
 ```
 
