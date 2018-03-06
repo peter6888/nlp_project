@@ -86,6 +86,20 @@ Mendeley https://www.mendeley.com/newsfeed/#group:d48f9375-8628-3922-aa04-ac0f88
 Slack https://cs224nprojectteam.slack.com
 
 ### Software Versions
-pip install tensorflow==1.4.1
+#### pip install tensorflow==1.4.1
 
-python 3.5.2 (or python 3.6.x)
+#### python 3.5.2 (or python 3.6.x)
+#### pyrouge
+Which is a perl based tool, and use pyrouge to call https://github.com/andersjo/pyrouge
+git clone https://github.com/andersjo/pyrouge.git
+edit ~/.pyrouge/settings.ini
+```
+[pyrouge settings]
+home_dir = /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5
+```
+Maybe want to re-build the .db for some reason
+```
+cd /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5/data/WordNet-2.0-Exceptions/
+perl buildExeptionDB.pl /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5/data/WordNet-2.0-Exceptions db /home/cs224n-team/notebooks/pyrouge/tools/ROUGE-1.5.5/data/WordNet-2.0.exe.db
+```
+
