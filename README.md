@@ -28,11 +28,11 @@ python run_summarization.py --mode=train --data_path=../nlp_project/data/finishe
 
 #### Validate
 ```
-python run_summarization.py --mode=eval --data_path=../nlp_project/data/finished_files/chunked/train_* --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
+python run_summarization.py --mode=eval --data_path=../nlp_project/data/finished_files/chunked/val_* --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
 ```
 #### Beam Search Validate
 ```
-python run_summarization.py --mode=decode --data_path=../nlp_project/data/finished_files/chunked/train_* --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
+python run_summarization.py --mode=decode --data_path=../nlp_project/data/finished_files/chunked/test_* --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
 ```
 #### Result Example
 > [data/sample_summary.txt](https://github.com/peter6888/nlp_project/blob/master/data/sample_summary.txt)
