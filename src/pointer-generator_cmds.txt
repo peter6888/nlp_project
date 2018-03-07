@@ -1,0 +1,5 @@
+python run_summarization.py --mode=train --data_path=../nlp_project/data/finished_files/chunked/train_*.bin --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
+
+python run_summarization.py --mode=decode --single_pass=1 --data_path=../nlp_project/data/finished_files/chunked/val_* --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
+
+python run_summarization.py --mode=eval --data_path=../nlp_project/data/finished_files/chunked/val_* --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
