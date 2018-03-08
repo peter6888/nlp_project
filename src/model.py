@@ -21,6 +21,7 @@ import time
 import numpy as np
 import tensorflow as tf
 from attention_decoder import attention_decoder
+from intra_attention_decoder import intra_attention_decoder
 from tensorflow.contrib.tensorboard.plugins import projector
 
 FLAGS = tf.app.flags.FLAGS
@@ -139,9 +140,13 @@ class SummarizationModel(object):
 
     prev_coverage = self.prev_coverage if hps.mode=="decode" and hps.coverage else None # In decode mode, we run attention_decoder one step at a time and so need to pass in the previous step's coverage vector each time
 
-    outputs, out_state, attn_dists, p_gens, coverage = attention_decoder(inputs, self._dec_in_state, self._enc_states, self._enc_padding_mask, cell, initial_state_attention=(hps.mode=="decode"), \
+    if hps.attention_model==1: #{0-Pointer-Attention, 1-Intra-Temporal-Attention, 2-.., 3-..}
+      actual_attention_decoder = intra_attention_decoder
+    else:
+      actual_attention_decoder = attention_decoder
+    outputs, out_state, attn_dists, p_gens, coverage = actual_attention_decoder(inputs, self._dec_in_state, self._enc_states, self._enc_padding_mask, cell, initial_state_attention=(hps.mode=="decode"), \
                                           pointer_gen=hps.pointer_gen, use_coverage=hps.coverage, \
-                                          prev_coverage=prev_coverage, attention_model=hps.attention_model)
+                                          prev_coverage=prev_coverage)
 
     return outputs, out_state, attn_dists, p_gens, coverage
 
@@ -202,6 +207,7 @@ class SummarizationModel(object):
     """Add the whole sequence-to-sequence model to the graph."""
     hps = self._hps
     vsize = self._vocab.size() # size of the vocabulary
+    #tf.logging.info("vocabulary size:{}".format(vsize)) #INFO:tensorflow:vocabulary size:50000
 
     with tf.variable_scope('seq2seq'):
       # Some initializers
