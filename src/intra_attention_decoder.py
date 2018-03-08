@@ -129,33 +129,35 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
       Get Intra-Decoder Attention Score. Refs to original paper section 2.2 https://arxiv.org/abs/1705.04304
       :param decoder_state:
       :param coverage: None
-      :return:attention score
+      :return:attention score with shape [batch_size, T]
       '''
       decoder_state = decoder_states[-1][1] # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
       decoder_hidden_vec_size = decoder_state.get_shape()[1].value
-      encoder_hidden_vec_size = encoder_states.get_shape()[3].value
 
       with variable_scope.variable_scope("ID_Attention"):
         # Intra-Decoder Attention
-        # W_d_attn for h_d (hidden decoder vectors) and h_e (hidden encoder vectors)
-        W_d_attn = tf.get_variable('W_d_attn', shape=(1, 1, encoder_hidden_vec_size, decoder_hidden_vec_size), \
+        # W_d_attn for h_d (hidden decoder vectors) and h_d (hidden decoder vectors)
+        W_d_attn = tf.get_variable('W_d_attn', shape=(1, 1, decoder_hidden_vec_size, decoder_hidden_vec_size), \
                                   initializer=tf.contrib.layers.xavier_initializer())
         decoder_T = len(decoder_states)
 
-        # Equation (6)
-        encoder_states_dot_W = nn_ops.conv2d(encoder_states, W_d_attn, [1, 1, 1, 1], "SAME") # shape (batch_size,?,1,decoder_hidden_vec_size)
-        decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1), 1) # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
-        e = math_ops.reduce_sum(decoder_state * encoder_states_dot_W, [2, 3])
-
-        # Equation (7)
-        if decoder_T==1:
-          attn_score = tf.zeros_like(e)
+        if decoder_T > 1:
+            # Equation (6)
+            decoder_states_ex = tf.expand_dims(decoder_states_stack, axis=2)
+            print("decoder_states.shape:{}".format(decoder_states_ex.get_shape()))
+            decoder_states_dot_W = nn_ops.conv2d(decoder_states_ex, W_d_attn, [1, 1, 1, 1], "SAME") # shape (batch_size,?,1,decoder_hidden_vec_size)
+            print(decoder_states_dot_W.get_shape())
+            #decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1), 1) # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
+            print(decoder_state.get_shape())
+            e = tf.einsum("ijkl,jl->ji", decoder_states_dot_W, decoder_state)
+            print(e.get_shape())
+            # Equation (7)
+            denominator = tf.reduce_sum(tf.exp(e[:-1,:]), axis=0) # ignore the last e
+            print(denominator.get_shape())
+            attn_score = tf.divide(tf.exp(e), denominator) # don't need the last one
         else:
-          denominator = tf.reduce_sum(tf.exp(ett), axis=0)
-          attn_score = tf.divide(tf.exp(e), denominator)
-
-        # append to ett list after attn_score been calculated
-        ett.append(e)
+            attn_score = tf.zeros([batch_size, decoder_T])
+        print("{} {}".format(decoder_T, attn_score.get_shape()))
 
         return attn_score
 
@@ -182,9 +184,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
       temporal_context = tf.squeeze(tf.einsum('ijkl,ij->ikl', encoder_states, temporal_attention))
       #print(temporal_context.get_shape())--> (16, 512)
       # Equation (8) - result has shape (batch_size, decoder_hidden_size)
-      _, decoder_states_list = map(list,zip(*decoder_states))
-      decoder_states_stack = tf.stack(decoder_states_list)
-      #print(decoder_states_stack.get_shape()) #(T,batch_size, decoder_hidden_size)
       decoder_context = tf.einsum('ijk,ji->jk', decoder_states_stack, decoder_attention)
       #print(decoder_context.get_shape()) #
       #with variable_scope.variable_scope("HyperAttentionScore"):
@@ -201,7 +200,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
     tf.logging.info("Using Intra Temporal Attention Model")
     attention = hybrid_attention
     eti = [] #The eti in equation (1), eti is a list length of decoder_steps_length, and each eti[t] is a list of length encoder_steps_length
-    ett = [] #The ett in equation (6), ett is a list length of decoder_steps_length, and each ett[t] is a list of length encoder_steps_length
     #eti and ett does NOT share same weight
 
     outputs = []
@@ -233,6 +231,9 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
 
       # Keep the decoder states
       decoder_states.append(state)
+      _, decoder_states_list = map(list,zip(*decoder_states))
+      decoder_states_stack = tf.stack(decoder_states_list)
+      #print(decoder_states_stack.get_shape()) #(T,batch_size, decoder_hidden_size)
 
       # Run the attention mechanism.
       if i == 0 and initial_state_attention:  # always true in decode mode
