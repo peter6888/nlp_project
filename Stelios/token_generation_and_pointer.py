@@ -2,8 +2,13 @@
 token_generation_and_pointer.py
 '''
 import tensorflow as tf
+import numpy as np
 import argparse
 
+batch_size = 16
+decoder_hidden_size = 512
+encoder_hidden_size = 256
+decoder_t = 6
 def tokenization(u_t, attn_score, h_d_t, c_e_t, c_d_t):
     '''
     Implementation of token generation and pointer (2.3, p.3). u_t = 1 if we
@@ -83,9 +88,21 @@ def test_tokenization(args):
     :param args:
     :return:
     '''
-    # To-do: use np.random.randn to generate data with correct dimension to pass into tokenization function
+    attn_score = np.random.randn(batch_size, decoder_t)
+    decoder_hidden_state = np.random.randn(batch_size, decoder_hidden_size)
+    temporal_context = np.random.randn(batch_size, encoder_hidden_size)
+    decoder_context = np.random.randn(batch_size, decoder_hidden_size)
+    pointer = tf.constant(np.random.randint(0,2))
+    generated = tokenization(pointer, attn_score, decoder_hidden_state, temporal_context, decoder_context)
     with tf.Session() as sess:
-        tf.logging.info("put test code here.")
+        ### fix below error on below call###
+        ''' Current error
+        raise ValueError(err.message)
+ValueError: Dimension 0 in both shapes must be equal, but are 256 and 512 for 'concat' (op: 'ConcatV2') with input shapes: [16,512], [16,256], [16,512], [] and with computed input tensors: input[3] = <0>.
+        '''
+        v = sess.run(generated)
+        print(v.shape)
+        #####################################
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Test the tokenization function to matching dimensions of parameters')
