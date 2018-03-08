@@ -23,18 +23,18 @@ sh run_cmd.sh
 pip install pyrouge
 ```
 #### Train
-Remember to change the name of the experiment and log_root (this is the directory where logs will be saved)
+Remember to change the name of the experiment and log_root (this is the directory where logs will be saved).
 ```
 python run_summarization.py --mode=train --data_path=../nlp_project/data/finished_files/chunked/train_*.bin --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
 ```
 
 #### Validate
-Remember to change the name of the experiment and log_root (this is the directory where logs will be saved)
+Remember to change the name of the experiment and log_root (this is the directory where logs will be saved).
 ```
 python run_summarization.py --mode=eval --data_path=../nlp_project/data/finished_files/chunked/val_* --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
 ```
 #### Beam Search Validate
-Remember to change the name of the experiment and log_root (this is the directory where logs will be saved)
+Remember to change the name of the experiment and log_root (this is the directory where logs will be saved).
 ```
 python run_summarization.py --mode=decode --data_path=../nlp_project/data/finished_files/chunked/test_* --vocab_path=../nlp_project/data/finished_files/vocab --log_root=/home/stonepeter/log --exp_name=baseline
 ```
