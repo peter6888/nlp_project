@@ -184,7 +184,8 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
       temporal_context = tf.squeeze(tf.einsum('ijkl,ij->ikl', encoder_states, temporal_attention))
       #print(temporal_context.get_shape())--> (16, 512)
       # Equation (8) - result has shape (batch_size, decoder_hidden_size)
-      decoder_context = tf.einsum('ijk,ji->jk', decoder_states_stack, decoder_attention)
+      if len(decoder_states) > 1:
+        decoder_context = tf.einsum('ijk,ji->jk', decoder_states_stack[:,:-1,:], decoder_attention[:-1,:]) # ignore the last e
       #print(decoder_context.get_shape()) #
       #with variable_scope.variable_scope("HyperAttentionScore"):
       #    W_out = tf.get_variable("W_out", shape=[])
