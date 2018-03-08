@@ -17,8 +17,8 @@ def read_scores():
                 rouges[i].append(float(l[len(search[i]):]))
 
     for i in range(len(rouges)):
-        print("Median of {}{}".format(search[i], \
-                                      np.median(np.array(rouges[i]))))
+        print("Median of {}{}".format(search[i], np.median(np.array(rouges[i]))))
+        print("Average of {}{}".format(search[i], np.average(np.array(rouges[i]))))
 
 if __name__ == '__main__':
     read_scores()
