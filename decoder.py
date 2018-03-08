@@ -49,7 +49,7 @@ def intra_decoder_attention(input, decoder_state, previous_word, time_step, prev
         #context vector
         c_d_t = tf.reduce_sum(tf.matmul(attention_score_e_d_tt_dash, previous_decoder_state))
         
-def token_generator_and_pointer(user_pointer=False):
+def token_generator_and_pointer(decoder_state_hdt, encoder_context_vector_cet, decoder_context_vector_cdt, temporal_attention_score_alpha_eti):
     with tf.variable_scoe('token_generator_and_pointer_scope'):
         
         W_out = tf.get_variable('W_d_attn', shape=[decoder_state.shape()[1],previous_decoder_state.shape()[0]], intializer=tf.contrib.layers.xavier_initializer())
@@ -58,8 +58,8 @@ def token_generator_and_pointer(user_pointer=False):
         W_u = tf.get_variable('W_u', shape=[decoder_state.shape()[1],previous_decoder_state.shape()[0]], intializer=tf.contrib.layers.xavier_initializer())
         b_u = tf.get_variable('b_u',shape=[], initializer=tf.zeros_initializer(tf.float32))
         
-        concat_decoder_state_context_vector = tf.contact([decoder_state, c_e_t, c_d_t], axis=1)
+        concat_decoder_state_context_vector = tf.concat([decoder_state_hdt, encoder_context_vector_cet, decoder_context_vector_cdt], axis=1)
         
         ut = tf.sigmoid(tf.matmul(W_u, concat_decoder_state_context_vector) + bu)
         
-        p_yt = tf.multiply(ut, attention_score_eti) + tf.multiply(ut, tf.nn.softmax(tf.matmul(W_out, concat_decoder_state_context_vector) + b_out))
+        p_yt = tf.multiply(ut, temporal_attention_score_alpha_eti) + tf.multiply(ut, tf.nn.softmax(tf.matmul(W_out, concat_decoder_state_context_vector) + b_out))
