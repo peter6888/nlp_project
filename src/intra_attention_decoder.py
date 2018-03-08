@@ -178,12 +178,23 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
 
       # hyper_att = tf.concat([temporal_attention, decoder_attention, decoder_states[-1][0]], axis=1)
       # to-do: missing the equation (5) (8) implementation
+      # Equation (5) - result has shape (batch_size, 1, encoder_hidden_size) --> After squeeze (batch_size, encoder_hidden_size)
+      temporal_context = tf.squeeze(tf.einsum('ijkl,ij->ikl', encoder_states, temporal_attention))
+      #print(temporal_context.get_shape())--> (16, 512)
+      # Equation (8) - result has shape (batch_size, decoder_hidden_size)
+      _, decoder_states_list = map(list,zip(*decoder_states))
+      decoder_states_stack = tf.stack(decoder_states_list)
+      #print(decoder_states_stack.get_shape()) #(T,batch_size, decoder_hidden_size)
+      decoder_context = tf.einsum('ijk,ji->jk', decoder_states_stack, decoder_attention)
+      #print(decoder_context.get_shape()) #
       #with variable_scope.variable_scope("HyperAttentionScore"):
+      #    W_out = tf.get_variable("W_out", shape=[])
       #  hyper_att = linear([temporal_attention] +[decoder_attention], cell.output_size, True)
       # Calculate attention distribution
       attn_dist = masked_attention(temporal_attention) # To-do: 2.3 a different way to caculate the distribution
-      context_vector = math_ops.reduce_sum(array_ops.reshape(attn_dist, [batch_size, -1, 1, 1]) * encoder_states, [1, 2]) # shape (batch_size, attn_size).
-      context_vector = array_ops.reshape(context_vector, [-1, attn_size])
+      #context_vector = math_ops.reduce_sum(array_ops.reshape(attn_dist, [batch_size, -1, 1, 1]) * encoder_states, [1, 2]) # shape (batch_size, attn_size).
+      #context_vector = array_ops.reshape(context_vector, [-1, attn_size])
+      context_vector = temporal_context
 
       return context_vector, attn_dist, coverage
 
