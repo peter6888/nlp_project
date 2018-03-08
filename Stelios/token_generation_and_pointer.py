@@ -83,11 +83,12 @@ def test_tokenization(args):
     :param args:
     :return:
     '''
+    # To-do: use np.random.randn to generate data with correct dimension to pass into tokenization function
     with tf.Session() as sess:
         tf.logging.info("put test code here.")
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description='Test the tokenization function to matching dimentions of parameters')
+  parser = argparse.ArgumentParser(description='Test the tokenization function to matching dimensions of parameters')
   subparsers = parser.add_subparsers()
 
   command_parser = subparsers.add_parser('test1', help='Test the tokenization function')
