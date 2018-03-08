@@ -1,5 +1,8 @@
+'''
+token_generation_and_pointer.py
+'''
 import tensorflow as tf
-
+import argparse
 
 def tokenization(u_t, attn_score, h_d_t, c_e_t, c_d_t):
     '''
@@ -73,3 +76,25 @@ def tokenization(u_t, attn_score, h_d_t, c_e_t, c_d_t):
     y_t = tf.add(u_t_one * y_t_u_one, (1 - u_t_one) * y_t_u_zero)
 
     return y_t
+
+def test_tokenization(args):
+    ''' test tokenization function
+    python token_generation_and_pointer.py test1
+    :param args:
+    :return:
+    '''
+    with tf.Session() as sess:
+        tf.logging.info("put test code here.")
+
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description='Test the tokenization function to matching dimentions of parameters')
+  subparsers = parser.add_subparsers()
+
+  command_parser = subparsers.add_parser('test1', help='Test the tokenization function')
+  command_parser.set_defaults(func=test_tokenization)
+
+  ARGS = parser.parse_args()
+  if not hasattr(ARGS, 'func'):
+      parser.print_help()
+  else:
+      ARGS.func(ARGS)
