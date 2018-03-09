@@ -233,18 +233,7 @@ class SummarizationModel(object):
         decoder_outputs, self._dec_out_state, self.attn_dists, self.p_gens, self.coverage = self._add_decoder(emb_dec_inputs)
 
       # Add the output projection to obtain the vocabulary distribution
-      with tf.variable_scope('output_projection'):
-        w = tf.get_variable('w', [hps.hidden_dim, vsize], dtype=tf.float32, initializer=self.trunc_norm_init)
-        w_t = tf.transpose(w)
-        v = tf.get_variable('v', [vsize], dtype=tf.float32, initializer=self.trunc_norm_init)
-        vocab_scores = [] # vocab_scores is the vocabulary distribution before applying softmax. Each entry on the list corresponds to one decoder step
-        for i,output in enumerate(decoder_outputs):
-          if i > 0:
-            tf.get_variable_scope().reuse_variables()
-          vocab_scores.append(tf.nn.xw_plus_b(output, w, v)) # apply the linear layer
-
-        vocab_dists = [tf.nn.softmax(s) for s in vocab_scores] # The vocabulary distributions. List length max_dec_steps of (batch_size, vsize) arrays. The words are in the order they appear in the vocabulary file.
-
+      vocab_dists, vocab_scores = self._calc_baseline_dist(decoder_outputs, hps, vsize)
 
       # For pointer-generator model, calc final distribution from copy distribution and vocabulary distribution
       if FLAGS.pointer_gen:
@@ -292,6 +281,27 @@ class SummarizationModel(object):
       topk_probs, self._topk_ids = tf.nn.top_k(final_dists, hps.batch_size*2) # take the k largest probs. note batch_size=beam_size in decode mode
       self._topk_log_probs = tf.log(topk_probs)
 
+  def _calc_baseline_dist(self, decoder_outputs, hps, vsize):
+      '''
+      Caculate the vocabulary distrubution and scores
+      :param decoder_outputs:
+      :param hps:
+      :param vsize:
+      :return:
+      '''
+      with tf.variable_scope('output_projection'):
+          w = tf.get_variable('w', [hps.hidden_dim, vsize], dtype=tf.float32, initializer=self.trunc_norm_init)
+          v = tf.get_variable('v', [vsize], dtype=tf.float32, initializer=self.trunc_norm_init)
+          vocab_scores = []  # vocab_scores is the vocabulary distribution before applying softmax. Each entry on the list corresponds to one decoder step
+          for i, output in enumerate(decoder_outputs):
+              if i > 0:
+                  tf.get_variable_scope().reuse_variables()
+              vocab_scores.append(tf.nn.xw_plus_b(output, w, v))  # apply the linear layer
+
+          vocab_dists = [tf.nn.softmax(s) for s in
+                         vocab_scores]  # The vocabulary distributions. List length max_dec_steps of (batch_size, vsize) arrays. The words are in the order they appear in the vocabulary file.
+
+      return vocab_dists, vocab_scores
 
   def _add_train_op(self):
     """Sets self._train_op, the op to run for training."""
