@@ -75,7 +75,7 @@ Rouge-2: 0.461538
 Rouge-L (Sentence Level): 0.103124
 Rouge-L (Summary Level): 0.004133
 ```
-### To-do List:
+### To-do List: see issues for detail tasks
 - [x] Intra-Temporal Attention Decoder on Input Sequence 
 
 - [x] Intra-Decoder Attention Decoder
