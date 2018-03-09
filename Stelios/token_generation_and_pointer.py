@@ -12,7 +12,7 @@ decoder_t = 6
 vsize = 50000
 
 
-def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vsize, use_pointer=False):
+def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vocab_size, use_pointer=False):
     '''
     Implementation of token generation and pointer (2.3, p.3). u_t = 1 if we
     want to pay attention to or copy the inputs and u_t = 0 if we do not. The
@@ -25,12 +25,12 @@ def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vsize, use_pointer=False):
         h_d_t: decoder state tensor at timestep t
         c_e_t: input context vector at timestep t
         c_d_t: decoder context vector at timestep t
-        vsize: vocabulary size scalar
+        vocab_size: vocabulary size scalar
         alpha_e_ti: tensor of attenion scores from equation (4)
         use_pointer: boolean, True = pointer mechanism, False = no pointer
 
     Returns:
-        y_t_distn: token probability distribution y_t
+        (final_distrubution, vocab_score): token probability distribution final_distrubution
     '''
     # Variables
     attn_conc = tf.concat(values=[h_d_t, c_e_t, c_d_t], axis=1)
@@ -46,24 +46,24 @@ def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vsize, use_pointer=False):
 
     # Tokenization with the pointer mechanism
     # Equation 10; alpha_e_ti is taken from Equation 4
-    y_t_u_zero = alpha_e_ti
+    copy_distrubution = alpha_e_ti
 
     # Tokenization with the token-generation softmax layer
     # TODO: I need to decide between vsize vs attn_score size
     with tf.variable_scope("Tokenization"):
         W_out = tf.get_variable('W_out',
-                                shape=[attn_conc_size, vsize],
+                                shape=[attn_conc_size, vocab_size],
                                 initializer=xavier_init)
         b_out = tf.get_variable("b_out",
-                                shape=[vsize],
+                                shape=[vocab_size],
                                 initializer=zeros_init)
 
     # Reuse variables across timesteps
     tf.get_variable_scope().reuse_variables()
 
     # Equation 9
-    z_out = tf.nn.xw_plus_b(attn_conc, W_out, b_out)
-    y_t_u_one = tf.nn.softmax(z_out)
+    vocab_score = tf.nn.xw_plus_b(attn_conc, W_out, b_out)
+    vocab_distribution = tf.nn.softmax(vocab_score)
 
     # Probability of using copy mechanism for decoding step t
     # TODO: I need to decide between vsize vs attn_score size
@@ -77,18 +77,18 @@ def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vsize, use_pointer=False):
 
     # Equation 11
     z_u = tf.nn.xw_plus_b(attn_conc, W_u, b_u)
-    u_t_one = tf.nn.sigmoid(z_u)
+    use_pointer = tf.nn.sigmoid(z_u)
 
-    # Toggle pointer mechanism
+    # Toggle pointer mechanism Equation 12
     # TODO: This can be simplified into 1 step when we decide row dims
     if use_pointer:
         # Final probability distribution for output token y_t (Equation 12)
         # TODO: Test whether I should be doing this in the TensorFlow API
-        y_t = tf.add(u_t_one * y_t_u_one, (1 - u_t_one) * y_t_u_zero)
+        final_distrubution = tf.add(use_pointer * vocab_distribution, (1 - use_pointer) * copy_distrubution)
     else:
-        y_t = y_t_u_zero
+        final_distrubution = copy_distrubution
 
-    return y_t
+    return (final_distrubution, vocab_score)
 
 
 def test_tokenization(args):
