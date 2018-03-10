@@ -191,7 +191,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
         if coverage is not None:
             coverage = array_ops.reshape(coverage, [batch_size, -1])
 
-        return outputs, state, attn_dists, p_gens, coverage
+        return {"outputs":outputs, "state":state, "attn_dists":attn_dists, "p_gens":p_gens, "coverage":coverage}
 
 
 def linear(args, output_size, bias, bias_start=0.0, scope=None):

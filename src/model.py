@@ -154,16 +154,13 @@ class SummarizationModel(object):
             actual_attention_decoder = intra_attention_decoder
         else:
             actual_attention_decoder = attention_decoder
-        outputs, out_state, attn_dists, p_gens, coverage = actual_attention_decoder(inputs, self._dec_in_state,
-                                                                                    self._enc_states,
-                                                                                    self._enc_padding_mask, cell,
-                                                                                    initial_state_attention=(
-                                                                                        hps.mode == "decode"), \
-                                                                                    pointer_gen=hps.pointer_gen,
-                                                                                    use_coverage=hps.coverage, \
-                                                                                    prev_coverage=prev_coverage)
 
-        return outputs, out_state, attn_dists, p_gens, coverage
+        rets = actual_attention_decoder(inputs, self._dec_in_state, self._enc_states, self._enc_padding_mask, cell, \
+                                        initial_state_attention=(hps.mode == "decode"), \
+                                        pointer_gen=hps.pointer_gen, use_coverage=hps.coverage, \
+                                        prev_coverage=prev_coverage)
+
+        return rets
 
     def _calc_final_dist(self, vocab_dists, attn_dists):
         """Calculate the final distribution, for the pointer-generator model
@@ -252,8 +249,8 @@ class SummarizationModel(object):
 
             # Add the decoder.
             with tf.variable_scope('decoder'):
-                decoder_outputs, self._dec_out_state, self.attn_dists, self.p_gens, self.coverage = self._add_decoder(
-                    emb_dec_inputs)
+                rets = self._add_decoder(emb_dec_inputs)
+                decoder_outputs, self._dec_out_state, self.attn_dists, self.p_gens, self.coverage = rets["outputs"], rets["state"], rets["attn_dists"], rets["p_gens"], rets["coverage"]
 
             # Add the output projection to obtain the vocabulary distribution
             vocab_dists, vocab_scores = self._calc_baseline_dist(decoder_outputs, hps, vsize)
