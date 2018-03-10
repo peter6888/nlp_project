@@ -282,7 +282,6 @@ def run_eval(model, batcher, vocab):
         if train_step % 100 == 0:
             summary_writer.flush()
 
-
 def main(unused_argv):
     if len(unused_argv) != 1:  # prints a message if you've entered flags incorrectly
         raise Exception("Problem with flags: %s" % unused_argv)
