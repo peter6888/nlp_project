@@ -65,6 +65,7 @@ def tokenization(params):
     tf.get_variable_scope().reuse_variables()
 
     # Equation 9
+    # TODO: check if vocab_scores is the real values we want
     vocab_scores = tf.nn.xw_plus_b(attentions, W_out, b_out)
     vocab_distribution = tf.nn.softmax(vocab_scores)
 

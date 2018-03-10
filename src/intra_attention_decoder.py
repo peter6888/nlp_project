@@ -255,7 +255,15 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         if coverage is not None:
             coverage = array_ops.reshape(coverage, [batch_size, -1])
 
-        return {"outputs":outputs, "state":state, "attn_dists":attn_dists, "p_gens":p_gens, "coverage":coverage}
+        # common part of return
+        decoder_rets = {"outputs":outputs, "state":state, "attn_dists":attn_dists, "p_gens":p_gens, "coverage":coverage}
+        # extra returns for Socher model
+
+        #decoder_rets["temoral_attention_scores"] = temoral_attention_scores
+        #decoder_rets["input_contexts"] = input_contexts
+        #decoder_rets["decoder_rets"] = decoder_contexts
+
+        return decoder_rets
 
 
 def linear(args, output_size, bias, bias_start=0.0, scope=None):

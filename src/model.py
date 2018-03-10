@@ -250,11 +250,23 @@ class SummarizationModel(object):
 
             # Add the decoder.
             with tf.variable_scope('decoder'):
-                rets = self._add_decoder(emb_dec_inputs)
-                decoder_outputs, self._dec_out_state, self.attn_dists, self.p_gens, self.coverage = rets["outputs"], rets["state"], rets["attn_dists"], rets["p_gens"], rets["coverage"]
+                decoder_rets = self._add_decoder(emb_dec_inputs)
+                decoder_outputs, self._dec_out_state, self.attn_dists, self.p_gens, self.coverage = decoder_rets["outputs"], decoder_rets["state"], decoder_rets["attn_dists"], decoder_rets["p_gens"], decoder_rets["coverage"]
+
+            # for Paulus, Xiong and Socher model
+            if hps.attention_model == 0:  # {0-Pointer-Attention, 1-Intra-Temporal-Attention, 2-.., 3-..}
+                temoral_attention_scores = decoder_rets["temoral_attention_scores"]
+                input_contexts = decoder_rets["input_contexts"]
+                decoder_contexts = decoder_rets["decoder_contexts"]
+                params =  {"temoral_attention_scores": temoral_attention_scores, "decoder_outputs": decoder_outputs,
+                              "input_contexts": input_contexts, "decoder_contexts": decoder_contexts, "vocab_size": vsize}
+                self.caculate_baseline_dist = self._calc_baseline_dists_paulus
+            else:
+                params = {"decoder_outputs": decoder_outputs, "hps": hps, "vsize": vsize}
+                self.caculate_baseline_dist = self._calc_baseline_dist
 
             # Add the output projection to obtain the vocabulary distribution
-            base_dist_ret = self._calc_baseline_dist(decoder_outputs, hps, vsize)
+            base_dist_ret = self.caculate_baseline_dist(params)
             vocab_dists, vocab_scores = base_dist_ret["vocab_dists"], base_dist_ret["vocab_scores"]
 
             # For pointer-generator model, calc final distribution from copy distribution and vocabulary distribution
@@ -307,7 +319,10 @@ class SummarizationModel(object):
                                                      hps.batch_size * 2)  # take the k largest probs. note batch_size=beam_size in decode mode
             self._topk_log_probs = tf.log(topk_probs)
 
-    def _calc_baseline_dist(self, decoder_outputs, hps, vsize):
+    def _calc_baseline_dists_paulus(self, calc_params):
+        return tokenization(calc_params)
+
+    def _calc_baseline_dist(self, calc_params):
         '''
         Caculate the vocabulary distrubution and scores
         :param decoder_outputs:
@@ -315,6 +330,9 @@ class SummarizationModel(object):
         :param vsize:
         :return:
         '''
+        decoder_outputs = calc_params["decoder_outputs"]
+        hps = calc_params["hps"]
+        vsize = calc_params["vsize"]
         with tf.variable_scope('output_projection'):
             w = tf.get_variable('w', [hps.hidden_dim, vsize], dtype=tf.float32, initializer=self.trunc_norm_init)
             v = tf.get_variable('v', [vsize], dtype=tf.float32, initializer=self.trunc_norm_init)
