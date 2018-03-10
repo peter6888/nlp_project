@@ -49,11 +49,11 @@ tf.app.flags.DEFINE_string('exp_name', '',
                            'Name for experiment. Logs will be saved in a directory with this name, under log_root.')
 
 # Hyperparameters
-tf.app.flags.DEFINE_integer('hidden_dim', 256, 'dimension of RNN hidden states')
+tf.app.flags.DEFINE_integer('hidden_dim', 128, 'dimension of RNN hidden states')
 tf.app.flags.DEFINE_integer('emb_dim', 128, 'dimension of word embeddings')
-tf.app.flags.DEFINE_integer('batch_size', 16, 'minibatch size')
-tf.app.flags.DEFINE_integer('max_enc_steps', 400, 'max timesteps of encoder (max source text tokens)')
-tf.app.flags.DEFINE_integer('max_dec_steps', 100, 'max timesteps of decoder (max summary tokens)')
+tf.app.flags.DEFINE_integer('batch_size', 4, 'minibatch size')
+tf.app.flags.DEFINE_integer('max_enc_steps', 200, 'max timesteps of encoder (max source text tokens)')
+tf.app.flags.DEFINE_integer('max_dec_steps', 50, 'max timesteps of decoder (max summary tokens)')
 tf.app.flags.DEFINE_integer('beam_size', 4, 'beam size for beam search decoding.')
 tf.app.flags.DEFINE_integer('min_dec_steps', 35,
                             'Minimum sequence length of generated summary. Applies only for beam search decoding mode')
@@ -228,11 +228,6 @@ def run_training(model, batcher, sess_context_manager, sv, summary_writer):
             summary_writer.add_summary(summaries, train_step)  # write the summaries
             if train_step % 100 == 0:  # flush the summary writer every so often
                 summary_writer.flush()
-
-            if train_step > 200:
-                print("stop run after 200 steps")
-                return
-
 
 def run_eval(model, batcher, vocab):
     """Repeatedly runs eval iterations, logging to screen and writing summaries. Saves the model with the best loss seen so far."""

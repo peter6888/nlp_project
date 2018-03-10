@@ -26,17 +26,17 @@ def tokenization(params):
     Returns:
         dict(final_distrubution, vocab_score): token probability distribution final_distrubution
     '''
-    temoral_attention_scores = params['temoral_attention_scores']
-    decoder_outputs = params['decoder_outputs']
-    input_contexts = params['input_contexts']
-    decoder_contexts = params['decoder_contexts']
+    temoral_attention_score = params['temoral_attention_scores']
+    decoder_output = params['decoder_outputs']
+    input_context = params['input_contexts']
+    decoder_context = params['decoder_contexts']
     vocab_size = params['vocab_size']
     use_pointer = False
     if 'use_pointer' in params:
         use_pointer = params['use_pointer']
 
     # Variables
-    attentions = tf.concat(values=[decoder_outputs, input_contexts, decoder_contexts], axis=1)
+    attentions = tf.concat(values=[decoder_output, input_context, decoder_context], axis=1)
 
     # Hyperparameters
     # TODO: I am not sure whether row dim is vize or alpha_e_ti size
@@ -49,7 +49,7 @@ def tokenization(params):
 
     # Tokenization with the pointer mechanism
     # Equation 10; alpha_e_ti is taken from Equation 4
-    copy_distrubution = temoral_attention_scores
+    copy_distrubution = temoral_attention_score
 
     # Tokenization with the token-generation softmax layer
     # TODO: I need to decide between vsize vs attn_score size
