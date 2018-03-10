@@ -95,6 +95,7 @@ def test_tokenization(args):
     decoder_hidden_size = 512
     encoder_hidden_size = 256
     decoder_t = 6
+    encoder_t = 5
     vsize = 50000
 
     attn_score = np.random.randn(batch_size, decoder_t)
@@ -109,13 +110,12 @@ def test_tokenization(args):
     dec_context = np.random.randn(batch_size, decoder_hidden_size)
     dec_context = tf.convert_to_tensor(dec_context, np.float32)
 
-    generated = tokenization({"temoral_attention_scores": attn_score, "decoder_outputs": dec_hidden_state,
-                              "input_contexts": enc_context, "decoder_contexts": dec_context, "vocab_size": vsize})
+    generated = tokenization( attn_score, dec_hidden_state, enc_context, dec_context, encoder_t, vsize)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         ret = sess.run(generated)
-        print(ret["vocab_dists"].shape)
+        print(ret)
 
 
 if __name__ == "__main__":
