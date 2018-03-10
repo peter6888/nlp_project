@@ -31,7 +31,8 @@ def tokenization(encoder_attn_score, decoder_state, encoder_context, decoder_con
         use_pointer: boolean, True = pointer mechanism, False = no pointer
 
     Returns:
-        dict(final_distrubution, vocab_score): token probability distribution final_distrubution
+        final_dists: the final distribution of words for each timestep y_t
+        vocab_scores: unnormalized scores for each word for each timestep t
     '''
     # Variables
     attentions = tf.concat(
@@ -87,7 +88,7 @@ def tokenization(encoder_attn_score, decoder_state, encoder_context, decoder_con
         pointer = tf.nn.sigmoid(z_u)
 
         # Final probability distribution for output token y_t (Equation 12)
-        vocab_dists = tf.add(pointer * copy_distn, (1 - pointer) * vocab_dists)
+        final_dists = tf.add(pointer * copy_distn, (1 - pointer) * vocab_dists)
 
     # Tokenization with the token-generation softmax layer
     else:
@@ -104,9 +105,9 @@ def tokenization(encoder_attn_score, decoder_state, encoder_context, decoder_con
 
         # Equation 9
         vocab_scores = tf.nn.xw_plus_b(attentions, W_out, b_out)
-        vocab_dists = tf.nn.softmax(vocab_scores)
+        final_dists = tf.nn.softmax(vocab_scores)
 
-    return vocab_dists, vocab_scores
+    return final_dists, vocab_scores
 
 
 def test_tokenization(args):
