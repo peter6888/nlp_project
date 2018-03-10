@@ -16,11 +16,11 @@ def tokenization(params):
 
     Args: Dictionary params
         u_t:
-        decoder_outputs: decoder state tensor at timestep t
-        input_contexts: input context vector at timestep t
-        decoder_contexts: decoder context vector at timestep t
+        decoder_output: decoder state tensor at timestep t
+        input_context: input context vector at timestep t
+        decoder_context: decoder context vector at timestep t
         vocab_size: vocabulary size scalar
-        temoral_attention_scores: tensor of attenion scores from equation (4)
+        temoral_attention_score: tensor of attenion scores from equation (4)
         use_pointer: boolean, True = pointer mechanism, False = no pointer
 
     Returns:
@@ -31,7 +31,6 @@ def tokenization(params):
     input_contexts = params['input_contexts']
     decoder_contexts = params['decoder_contexts']
     vocab_size = params['vocab_size']
-    print("shapes:{}".format(temoral_attention_scores.get_shape()))
     use_pointer = False
     if 'use_pointer' in params:
         use_pointer = params['use_pointer']
@@ -71,13 +70,13 @@ def tokenization(params):
     vocab_distribution = tf.nn.softmax(vocab_scores)
 
     # Probability of using copy mechanism for decoding step t
-    # TODO: I need to decide between vsize vs attn_score size
+    # TODO: I need to decide between vocab_size vs attn_score size
     with tf.variable_scope("Copy_mechanism", reuse=tf.AUTO_REUSE):
         W_u = tf.get_variable('W_u',
-                              shape=[attn_conc_size, attn_score_size],
+                              shape=[attn_conc_size, vocab_size],
                               initializer=xavier_init)
         b_u = tf.get_variable("b_u",
-                              shape=[attn_score_size],
+                              shape=[vocab_size],
                               initializer=zeros_init)
 
     # Equation 11
@@ -86,14 +85,14 @@ def tokenization(params):
 
     # Toggle pointer mechanism Equation 12
     # TODO: This can be simplified into 1 step when we decide row dims
-    if use_pointer:
+    #if use_pointer:
         # Final probability distribution for output token y_t (Equation 12)
         # TODO: Test whether I should be doing this in the TensorFlow API
-        vocab_dists = tf.add(pointer * vocab_distribution, (1 - pointer) * copy_distrubution)
-    else:
-        vocab_dists = copy_distrubution
+    vocab_dists = tf.add(pointer * copy_distrubution, (1 - pointer) * vocab_distribution)
+    #else:
+    #    vocab_dists = copy_distrubution
 
-    return {"vocab_dists": vocab_dists, "vocab_scores": vocab_scores}
+    return vocab_dists, vocab_scores
 
 def test_tokenization(args):
     ''' test tokenization function

@@ -133,6 +133,25 @@ class SummarizationModel(object):
             new_h = tf.nn.relu(tf.matmul(old_h, w_reduce_h) + bias_reduce_h)  # Get new state from old state
             return tf.contrib.rnn.LSTMStateTuple(new_c, new_h)  # Return new cell and state
 
+    def _reduce_context(self, larger_size_context):
+        """
+        Reduce context from vector_size * 2 to vector_size
+        :param larger_size_context: Tensor shape ([batch_size, vector_size * 2])
+        :return:smaller_size_contexts: Tensor shape ([batch_size, vector_size])
+        """
+        vector_size = (larger_size_context.get_shape().as_list()[1]) / 2
+        with tf.variable_scope('reduce_contexts'):
+            # Define weights and biases to reduce the cell and reduce the state
+            w_reduce = tf.get_variable('w_reduce', [vector_size * 2, vector_size], dtype=tf.float32,
+                                         initializer=self.trunc_norm_init)
+            bias_reduce = tf.get_variable('bias_reduce', [vector_size], dtype=tf.float32,
+                                         initializer=self.trunc_norm_init)
+
+        # Apply linear layer
+        reduced_context = tf.nn.relu(tf.nn.xw_plus_b(larger_size_context, w_reduce, bias_reduce))
+
+        return reduced_context
+
     def _add_decoder(self, inputs):
         """Add attention decoder to the graph. In train or eval mode, you call this once to get output on ALL steps. In decode (beam search) mode, you call this once for EACH decoder step.
 
@@ -254,20 +273,20 @@ class SummarizationModel(object):
                 decoder_outputs, self._dec_out_state, self.attn_dists, self.p_gens, self.coverage = decoder_rets["outputs"], decoder_rets["state"], decoder_rets["attn_dists"], decoder_rets["p_gens"], decoder_rets["coverage"]
 
             # for Paulus, Xiong and Socher model
-            if hps.attention_model == 0:  # {0-Pointer-Attention, 1-Intra-Temporal-Attention, 2-.., 3-..}
+            if hps.attention_model == 1:  # {0-Pointer-Attention, 1-Intra-Temporal-Attention, 2-.., 3-..}
                 temoral_attention_scores = decoder_rets["temoral_attention_scores"]
                 input_contexts = decoder_rets["input_contexts"]
                 decoder_contexts = decoder_rets["decoder_contexts"]
                 params =  {"temoral_attention_scores": temoral_attention_scores, "decoder_outputs": decoder_outputs,
                               "input_contexts": input_contexts, "decoder_contexts": decoder_contexts, "vocab_size": vsize}
+
                 self.caculate_baseline_dist = self._calc_baseline_dists_paulus
             else:
                 params = {"decoder_outputs": decoder_outputs, "hps": hps, "vsize": vsize}
                 self.caculate_baseline_dist = self._calc_baseline_dist
 
             # Add the output projection to obtain the vocabulary distribution
-            base_dist_ret = self.caculate_baseline_dist(params)
-            vocab_dists, vocab_scores = base_dist_ret["vocab_dists"], base_dist_ret["vocab_scores"]
+            vocab_dists, vocab_scores = self.caculate_baseline_dist(params)
 
             # For pointer-generator model, calc final distribution from copy distribution and vocabulary distribution
             if FLAGS.pointer_gen:
@@ -320,7 +339,51 @@ class SummarizationModel(object):
             self._topk_log_probs = tf.log(topk_probs)
 
     def _calc_baseline_dists_paulus(self, calc_params):
-        return tokenization(calc_params)
+        temoral_attention_scores = calc_params['temoral_attention_scores']
+        decoder_outputs = calc_params['decoder_outputs']
+        input_contexts = calc_params['input_contexts']
+        decoder_contexts = calc_params['decoder_contexts']
+        vocab_size = calc_params['vocab_size']
+        use_pointer = False
+        if 'use_pointer' in calc_params:
+            use_pointer = calc_params['use_pointer']
+
+        vocab_dists = []
+        vocab_scores = []
+
+        with tf.variable_scope('output_projection_paulus'):
+            for i, output in enumerate(decoder_outputs):
+                if i > 0:
+                    tf.get_variable_scope().reuse_variables()
+                tokenization_params = {}
+                tokenization_params['temoral_attention_scores'] = temoral_attention_scores[i]
+
+                tokenization_params['decoder_outputs'] = decoder_outputs[i]
+
+                # reduce the dimention for input_contexts
+                input_context = self._reduce_context(input_contexts[i])
+                tokenization_params['input_contexts'] = input_context
+
+                #insert zeros for decoder_outputs
+                decoder_context = self.insert_zeros_at_begin(decoder_contexts[i])
+                tokenization_params['decoder_contexts'] = decoder_context
+
+                tokenization_params['vocab_size'] = vocab_size
+                tokenization_params['use_pointer'] = use_pointer
+                vocab_dist, vocab_score = tokenization(tokenization_params)
+                vocab_dists.append(vocab_dist)
+                vocab_scores.append(vocab_score)
+
+        return vocab_dists, vocab_scores
+
+    def insert_zeros_at_begin(self, old_tensor):
+        '''
+        Experiement how to insert zero for a Tensor with shape (15, 256) to (16, 256)
+        Returns:
+        '''
+        zero_tensor = tf.zeros(shape=[1, old_tensor.get_shape().as_list()[1]])
+        new_tensor = tf.concat([zero_tensor, old_tensor], axis=0)
+        return new_tensor
 
     def _calc_baseline_dist(self, calc_params):
         '''
@@ -345,7 +408,7 @@ class SummarizationModel(object):
             vocab_dists = [tf.nn.softmax(s) for s in
                            vocab_scores]  # The vocabulary distributions. List length max_dec_steps of (batch_size, vsize) arrays. The words are in the order they appear in the vocabulary file.
 
-        return {"vocab_dists": vocab_dists, "vocab_scores": vocab_scores}
+        return vocab_dists, vocab_scores
 
     def _add_train_op(self):
         """Sets self._train_op, the op to run for training."""
