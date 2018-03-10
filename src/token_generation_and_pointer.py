@@ -31,6 +31,7 @@ def tokenization(params):
     input_contexts = params['input_contexts']
     decoder_contexts = params['decoder_contexts']
     vocab_size = params['vocab_size']
+    print("shapes:{}".format(temoral_attention_scores.get_shape()))
     use_pointer = False
     if 'use_pointer' in params:
         use_pointer = params['use_pointer']
