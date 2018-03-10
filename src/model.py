@@ -253,7 +253,8 @@ class SummarizationModel(object):
                 decoder_outputs, self._dec_out_state, self.attn_dists, self.p_gens, self.coverage = rets["outputs"], rets["state"], rets["attn_dists"], rets["p_gens"], rets["coverage"]
 
             # Add the output projection to obtain the vocabulary distribution
-            vocab_dists, vocab_scores = self._calc_baseline_dist(decoder_outputs, hps, vsize)
+            base_dist_ret = self._calc_baseline_dist(decoder_outputs, hps, vsize)
+            vocab_dists, vocab_scores = base_dist_ret["vocab_dists"], base_dist_ret["vocab_scores"]
 
             # For pointer-generator model, calc final distribution from copy distribution and vocabulary distribution
             if FLAGS.pointer_gen:
@@ -325,7 +326,7 @@ class SummarizationModel(object):
             vocab_dists = [tf.nn.softmax(s) for s in
                            vocab_scores]  # The vocabulary distributions. List length max_dec_steps of (batch_size, vsize) arrays. The words are in the order they appear in the vocabulary file.
 
-        return vocab_dists, vocab_scores
+        return {"vocab_dists": vocab_dists, "vocab_scores": vocab_scores}
 
     def _add_train_op(self):
         """Sets self._train_op, the op to run for training."""

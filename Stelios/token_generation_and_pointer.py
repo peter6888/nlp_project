@@ -5,23 +5,16 @@ import tensorflow as tf
 import numpy as np
 import argparse
 
-batch_size = 16
-decoder_hidden_size = 512
-encoder_hidden_size = 256
-decoder_t = 6
-vsize = 50000
-
-
 # below function will take parameters (self, decoder_outputs, hps, vsize, *extra_args):
 def tokenization(params):
     '''
-    Implementation of token generation and pointer (2.3, p.3). u_t = 1 if we
+    Token generation and pointer (2.3, p.3). u_t = 1 if we
     want to pay attention to or copy the inputs and u_t = 0 if we do not. The
     tokenization mechanism allows our model to learn the representation of
     words it had not seen in training by copying the representation of an
     unknown word from its input (p.5 of article). p(u_t) = p_gen from Abi.
 
-    Args:
+    Args: Dictionary params
         u_t:
         decoder_outputs: decoder state tensor at timestep t
         input_contexts: input context vector at timestep t
@@ -31,7 +24,7 @@ def tokenization(params):
         use_pointer: boolean, True = pointer mechanism, False = no pointer
 
     Returns:
-        (final_distrubution, vocab_score): token probability distribution final_distrubution
+        dict(final_distrubution, vocab_score): token probability distribution final_distrubution
     '''
     temoral_attention_scores = params['temoral_attention_scores']
     decoder_outputs = params['decoder_outputs']
@@ -72,8 +65,8 @@ def tokenization(params):
     tf.get_variable_scope().reuse_variables()
 
     # Equation 9
-    vocab_score = tf.nn.xw_plus_b(attentions, W_out, b_out)
-    vocab_distribution = tf.nn.softmax(vocab_score)
+    vocab_scores = tf.nn.xw_plus_b(attentions, W_out, b_out)
+    vocab_distribution = tf.nn.softmax(vocab_scores)
 
     # Probability of using copy mechanism for decoding step t
     # TODO: I need to decide between vsize vs attn_score size
@@ -94,12 +87,11 @@ def tokenization(params):
     if use_pointer:
         # Final probability distribution for output token y_t (Equation 12)
         # TODO: Test whether I should be doing this in the TensorFlow API
-        final_distrubution = tf.add(pointer * vocab_distribution, (1 - pointer) * copy_distrubution)
+        vocab_dists = tf.add(pointer * vocab_distribution, (1 - pointer) * copy_distrubution)
     else:
-        final_distrubution = copy_distrubution
+        vocab_dists = copy_distrubution
 
-    return {"final_distrubution": final_distrubution, "vocab_score": vocab_score}
-
+    return {"vocab_dists": vocab_dists, "vocab_scores": vocab_scores}
 
 def test_tokenization(args):
     ''' test tokenization function
@@ -107,6 +99,12 @@ def test_tokenization(args):
     :param args:
     :return:
     '''
+    batch_size = 16
+    decoder_hidden_size = 512
+    encoder_hidden_size = 256
+    decoder_t = 6
+    vsize = 50000
+
     attn_score = np.random.randn(batch_size, decoder_t)
     attn_score = tf.convert_to_tensor(attn_score, np.float32)
 
@@ -125,7 +123,7 @@ def test_tokenization(args):
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         ret = sess.run(generated)
-        print(ret["final_distrubution"].shape)
+        print(ret["vocab_dists"].shape)
 
 
 if __name__ == "__main__":
