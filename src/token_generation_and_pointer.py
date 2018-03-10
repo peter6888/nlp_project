@@ -71,6 +71,7 @@ def tokenization(params):
 
     # Probability of using copy mechanism for decoding step t
     # TODO: I need to decide between vocab_size vs attn_score size
+    '''
     with tf.variable_scope("Copy_mechanism", reuse=tf.AUTO_REUSE):
         W_u = tf.get_variable('W_u',
                               shape=[attn_conc_size, attn_score_size],
@@ -82,13 +83,13 @@ def tokenization(params):
     # Equation 11
     z_u = tf.nn.xw_plus_b(attentions, W_u, b_u)
     pointer = tf.nn.sigmoid(z_u)
-
+    '''
     # Toggle pointer mechanism Equation 12
     # TODO: This can be simplified into 1 step when we decide row dims
     #if use_pointer:
         # Final probability distribution for output token y_t (Equation 12)
         # TODO: Test whether I should be doing this in the TensorFlow API
-    vocab_dists = tf.add(pointer * copy_distrubution, (1 - pointer) * vocab_distribution)
+    vocab_dists = vocab_distribution #tf.add(pointer * copy_distrubution, (1 - pointer) * vocab_distribution)
     #else:
     #    vocab_dists = copy_distrubution
 
