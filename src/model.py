@@ -370,6 +370,7 @@ class SummarizationModel(object):
 
                 tokenization_params['vocab_size'] = vocab_size
                 tokenization_params['use_pointer'] = use_pointer
+                tokenization_params["max_enc_steps"] = self._hps.max_enc_steps
                 vocab_dist, vocab_score = tokenization(tokenization_params)
                 vocab_dists.append(vocab_dist)
                 vocab_scores.append(vocab_score)

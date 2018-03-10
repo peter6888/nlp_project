@@ -40,8 +40,8 @@ def tokenization(params):
 
     # Hyperparameters
     # TODO: I am not sure whether row dim is vize or alpha_e_ti size
-    attn_conc_size = attentions.get_shape()[1].value
-    attn_score_size = temoral_attention_scores.get_shape()[1].value
+    attn_conc_size = attentions.get_shape().as_list()[1]
+    attn_score_size = params["max_enc_steps"]
 
     # Initializations
     xavier_init = tf.contrib.layers.xavier_initializer()
@@ -73,10 +73,10 @@ def tokenization(params):
     # TODO: I need to decide between vocab_size vs attn_score size
     with tf.variable_scope("Copy_mechanism", reuse=tf.AUTO_REUSE):
         W_u = tf.get_variable('W_u',
-                              shape=[attn_conc_size, vocab_size],
+                              shape=[attn_conc_size, attn_score_size],
                               initializer=xavier_init)
         b_u = tf.get_variable("b_u",
-                              shape=[vocab_size],
+                              shape=[attn_score_size],
                               initializer=zeros_init)
 
     # Equation 11
