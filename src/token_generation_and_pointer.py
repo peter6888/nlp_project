@@ -6,7 +6,7 @@ import numpy as np
 import argparse
 
 # below function will take parameters (self, decoder_outputs, hps, vsize, *extra_args):
-def tokenization(params):
+def tokenization(temoral_attention_score, decoder_output, input_context, decoder_context, attn_score_size, vocab_size, use_pointer=False):
     '''
     Token generation and pointer (2.3, p.3). u_t = 1 if we
     want to pay attention to or copy the inputs and u_t = 0 if we do not. The
@@ -19,6 +19,7 @@ def tokenization(params):
         decoder_output: decoder state tensor at timestep t
         input_context: input context vector at timestep t
         decoder_context: decoder context vector at timestep t
+        attn_score_size: the attn_score_size from hyper-parameter
         vocab_size: vocabulary size scalar
         temoral_attention_score: tensor of attenion scores from equation (4)
         use_pointer: boolean, True = pointer mechanism, False = no pointer
@@ -26,22 +27,12 @@ def tokenization(params):
     Returns:
         dict(final_distrubution, vocab_score): token probability distribution final_distrubution
     '''
-    temoral_attention_score = params['temoral_attention_scores']
-    decoder_output = params['decoder_outputs']
-    input_context = params['input_contexts']
-    decoder_context = params['decoder_contexts']
-    vocab_size = params['vocab_size']
-    use_pointer = False
-    if 'use_pointer' in params:
-        use_pointer = params['use_pointer']
-
     # Variables
     attentions = tf.concat(values=[decoder_output, input_context, decoder_context], axis=1)
 
     # Hyperparameters
     # TODO: I am not sure whether row dim is vize or alpha_e_ti size
     attn_conc_size = attentions.get_shape().as_list()[1]
-    attn_score_size = params["max_enc_steps"]
 
     # Initializations
     xavier_init = tf.contrib.layers.xavier_initializer()
@@ -88,7 +79,7 @@ def tokenization(params):
     #if use_pointer:
         # Final probability distribution for output token y_t (Equation 12)
         # TODO: Test whether I should be doing this in the TensorFlow API
-    vocab_dists = tf.add(pointer * copy_distrubution, (1 - pointer) * vocab_distribution)
+    vocab_dists = vocab_distribution #tf.add(pointer * copy_distrubution, (1 - pointer) * vocab_distribution)
     #else:
     #    vocab_dists = copy_distrubution
 

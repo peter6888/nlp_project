@@ -344,83 +344,22 @@ class SummarizationModel(object):
         input_contexts = calc_params['input_contexts']
         decoder_contexts = calc_params['decoder_contexts']
         vocab_size = calc_params['vocab_size']
-        use_pointer = False
-        if 'use_pointer' in calc_params:
-            use_pointer = calc_params['use_pointer']
 
         vocab_dists = []
         vocab_scores = []
 
-        # Hyperparameters
-        # TODO: I am not sure whether row dim is vize or alpha_e_ti size
-        attn_conc_size = decoder_outputs[0].get_shape().as_list()[1] + input_contexts[0].get_shape().as_list()[1] / 2 + decoder_contexts[0].get_shape().as_list()[1]
-        attn_score_size = self._hps.max_enc_steps
-
-        # Initializations
-        xavier_init = tf.contrib.layers.xavier_initializer()
-        zeros_init = tf.zeros_initializer()
-
         with tf.variable_scope('output_projection_paulus'):
-            with tf.variable_scope("Tokenization"):
-                W_out = tf.get_variable('W_out',
-                                        shape=[attn_conc_size, vocab_size],
-                                        initializer=xavier_init)
-                b_out = tf.get_variable("b_out",
-                                        shape=[vocab_size],
-                                        initializer=zeros_init)
             for i, output in enumerate(decoder_outputs):
                 if i > 0:
                     tf.get_variable_scope().reuse_variables()
 
                 # reduce the dimention for input_contexts
                 input_context = self._reduce_context(input_contexts[i])
-
                 #insert zeros for decoder_outputs
                 decoder_context = self.insert_zeros_at_begin(decoder_contexts[i])
 
-                # Variables
-                attentions = tf.concat(values=[decoder_outputs[i], input_context, decoder_context], axis=1)
-
-                # Tokenization with the pointer mechanism
-                # Equation 10; alpha_e_ti is taken from Equation 4
-                copy_distrubution = temoral_attention_scores[i]
-
-                # Tokenization with the token-generation softmax layer
-                # TODO: I need to decide between vsize vs attn_score size
-
-
-                # Reuse variables across timesteps
-                tf.get_variable_scope().reuse_variables()
-
-                # Equation 9
-                # TODO: check if vocab_scores is the real values we want
-                vocab_score = tf.nn.xw_plus_b(attentions, W_out, b_out)
-                vocab_distribution = tf.nn.softmax(vocab_score)
-
-                # Probability of using copy mechanism for decoding step t
-                # TODO: I need to decide between vocab_size vs attn_score size
-                '''
-                with tf.variable_scope("Copy_mechanism", reuse=tf.AUTO_REUSE):
-                    W_u = tf.get_variable('W_u',
-                                          shape=[attn_conc_size, attn_score_size],
-                                          initializer=xavier_init)
-                    b_u = tf.get_variable("b_u",
-                                          shape=[attn_score_size],
-                                          initializer=zeros_init)
-
-                # Equation 11
-                z_u = tf.nn.xw_plus_b(attentions, W_u, b_u)
-                pointer = tf.nn.sigmoid(z_u)
-                '''
-                # Toggle pointer mechanism Equation 12
-                # TODO: This can be simplified into 1 step when we decide row dims
-                #if use_pointer:
-                    # Final probability distribution for output token y_t (Equation 12)
-                    # TODO: Test whether I should be doing this in the TensorFlow API
-                vocab_dist = vocab_distribution #tf.add(pointer * copy_distrubution, (1 - pointer) * vocab_distribution)
-                #else:
-                #    vocab_dists = copy_distrubution
-
+                vocab_dist, vocab_score = tokenization(temoral_attention_scores[i], decoder_outputs[i], input_context, decoder_context, \
+                                                       self._hps.max_enc_steps, vocab_size)
 
                 vocab_dists.append(vocab_dist)
                 vocab_scores.append(vocab_score)
