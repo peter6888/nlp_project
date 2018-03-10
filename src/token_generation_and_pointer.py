@@ -6,30 +6,38 @@ import numpy as np
 import argparse
 
 # below function will take parameters (self, decoder_outputs, hps, vsize, *extra_args):
-def tokenization(temoral_attention_score, decoder_output, input_context, decoder_context, attn_score_size, vocab_size, use_pointer=False):
+
+
+def tokenization(encoder_attn_score, decoder_state, encoder_context, decoder_context, attn_score_size, vocab_size, use_pointer=False):
     '''
     Token generation and pointer (2.3, p.3). u_t = 1 if we
     want to pay attention to or copy the inputs and u_t = 0 if we do not. The
     tokenization mechanism allows our model to learn the representation of
     words it had not seen in training by copying the representation of an
     unknown word from its input (p.5 of article). p(u_t) = p_gen from Abi.
+
     Args: Dictionary params
-        u_t:
-        decoder_output: decoder state tensor at timestep t
-        input_context: input context vector at timestep t
-        decoder_context: decoder context vector at timestep t
+        encoder_attn_score: tensor of attenion scores from Equation 4,
+            size = [batch_size x max_enc_steps]
+        decoder_state: decoder state tensor at timestep t,
+            size = [batch_size x hidden_dim]
+        encoder_context: input context vector at timestep t,
+            size = [batch_size x hidden_dim]
+        decoder_context: decoder context vector at timestep t,
+            size = [batch_size x hidden_dim]
         attn_score_size: the attn_score_size from hyper-parameter
-        vocab_size: vocabulary size scalar
-        temoral_attention_score: tensor of attenion scores from equation (4)
+        vocab_size: vocabulary size,
+            size = [vocab_size]
         use_pointer: boolean, True = pointer mechanism, False = no pointer
+
     Returns:
         dict(final_distrubution, vocab_score): token probability distribution final_distrubution
     '''
     # Variables
-    attentions = tf.concat(values=[decoder_output, input_context, decoder_context], axis=1)
+    attentions = tf.concat(
+        values=[decoder_state, encoder_context, decoder_context], axis=1)
 
     # Hyperparameters
-    # TODO: I am not sure whether row dim is vize or alpha_e_ti size
     attn_conc_size = attentions.get_shape().as_list()[1]
 
     # Initializations
@@ -37,51 +45,69 @@ def tokenization(temoral_attention_score, decoder_output, input_context, decoder
     zeros_init = tf.zeros_initializer()
 
     # Tokenization with the pointer mechanism
-    # Equation 10; alpha_e_ti is taken from Equation 4
-    copy_distrubution = temoral_attention_score
+    # TODO: pointer has not yet been implemented
+    if use_pointer:
+        # TODO: Calculate number of out-of-vocabulary words
+        oov_size = 0
+        # Expanded vocabulary size
+        new_vocab_size = vocab_size + oov_size
+
+        with tf.variable_scope("Tokenization"):
+            W_out = tf.get_variable('W_out',
+                                    shape=[attn_conc_size, new_vocab_size],
+                                    initializer=xavier_init)
+            b_out = tf.get_variable("b_out",
+                                    shape=[new_vocab_size],
+                                    initializer=zeros_init)
+
+        # Reuse variables across timesteps
+        tf.get_variable_scope().reuse_variables()
+
+        # Equation 9
+        vocab_scores = tf.nn.xw_plus_b(attentions, W_out, b_out)
+        vocab_dists = tf.nn.softmax(vocab_scores)
+
+        # Equation 10; encoder_attn_size is the output of Equation 4
+        copy_distn = encoder_attn_score
+
+        # TODO: turn copy_distn into a new_vocab_size-vector
+
+        # TODO: Being implemented by Apurva
+        with tf.variable_scope("Copy_mechanism", reuse=tf.AUTO_REUSE):
+            W_u = tf.get_variable('W_u',
+                                  shape=[attn_conc_size, 1],
+                                  initializer=xavier_init)
+            b_u = tf.get_variable("b_u",
+                                  shape=[1],
+                                  initializer=zeros_init)
+
+        # Probability of using copy mechanism for decoding step t
+        # Equation 11; pointer size = [batch_size x 1]
+        z_u = tf.nn.xw_plus_b(attentions, W_u, b_u)
+        pointer = tf.nn.sigmoid(z_u)
+
+        # Final probability distribution for output token y_t (Equation 12)
+        tf.add(pointer * copy_distn, (1 - pointer) * vocab_dists)
 
     # Tokenization with the token-generation softmax layer
-    # TODO: I need to decide between vsize vs attn_score size
-    with tf.variable_scope("Tokenization"):
-        W_out = tf.get_variable('W_out',
-                                shape=[attn_conc_size, vocab_size],
-                                initializer=xavier_init)
-        b_out = tf.get_variable("b_out",
-                                shape=[vocab_size],
-                                initializer=zeros_init)
+    else:
+        with tf.variable_scope("Tokenization"):
+            W_out = tf.get_variable('W_out',
+                                    shape=[attn_conc_size, vocab_size],
+                                    initializer=xavier_init)
+            b_out = tf.get_variable("b_out",
+                                    shape=[vocab_size],
+                                    initializer=zeros_init)
 
-    # Reuse variables across timesteps
-    tf.get_variable_scope().reuse_variables()
+        # Reuse variables across timesteps
+        tf.get_variable_scope().reuse_variables()
 
-    # Equation 9
-    # TODO: check if vocab_scores is the real values we want
-    vocab_scores = tf.nn.xw_plus_b(attentions, W_out, b_out)
-    vocab_distribution = tf.nn.softmax(vocab_scores)
-
-    # Probability of using copy mechanism for decoding step t
-    # TODO: I need to decide between vocab_size vs attn_score size
-    with tf.variable_scope("Copy_mechanism", reuse=tf.AUTO_REUSE):
-        W_u = tf.get_variable('W_u',
-                              shape=[attn_conc_size, attn_score_size],
-                              initializer=xavier_init)
-        b_u = tf.get_variable("b_u",
-                              shape=[attn_score_size],
-                              initializer=zeros_init)
-
-    # Equation 11
-    z_u = tf.nn.xw_plus_b(attentions, W_u, b_u)
-    pointer = tf.nn.sigmoid(z_u)
-
-    # Toggle pointer mechanism Equation 12
-    # TODO: This can be simplified into 1 step when we decide row dims
-    #if use_pointer:
-        # Final probability distribution for output token y_t (Equation 12)
-        # TODO: Test whether I should be doing this in the TensorFlow API
-    vocab_dists = vocab_distribution #tf.add(pointer * copy_distrubution, (1 - pointer) * vocab_distribution)
-    #else:
-    #    vocab_dists = copy_distrubution
+        # Equation 9
+        vocab_scores = tf.nn.xw_plus_b(attentions, W_out, b_out)
+        vocab_dists = tf.nn.softmax(vocab_scores)
 
     return vocab_dists, vocab_scores
+
 
 def test_tokenization(args):
     ''' test tokenization function
@@ -108,7 +134,8 @@ def test_tokenization(args):
     dec_context = np.random.randn(batch_size, decoder_hidden_size)
     dec_context = tf.convert_to_tensor(dec_context, np.float32)
 
-    generated = tokenization( attn_score, dec_hidden_state, enc_context, dec_context, encoder_t, vsize)
+    generated = tokenization(attn_score, dec_hidden_state,
+                             enc_context, dec_context, encoder_t, vsize)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -129,4 +156,4 @@ if __name__ == "__main__":
     if not hasattr(ARGS, 'func'):
         parser.print_help()
     else:
-ARGS.func(ARGS)
+        ARGS.func(ARGS)
