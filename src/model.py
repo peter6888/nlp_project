@@ -25,6 +25,7 @@ from tensorflow.contrib.tensorboard.plugins import projector
 
 from attention_decoder import attention_decoder
 from intra_attention_decoder import intra_attention_decoder
+from token_generation_and_pointer import tokenization
 
 FLAGS = tf.app.flags.FLAGS
 
