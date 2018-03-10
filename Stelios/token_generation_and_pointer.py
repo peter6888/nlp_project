@@ -11,6 +11,7 @@ encoder_hidden_size = 256
 decoder_t = 6
 vsize = 50000
 
+
 # below function will take parameters (self, decoder_outputs, hps, vsize, *extra_args):
 def tokenization(params):
     '''
@@ -33,13 +34,13 @@ def tokenization(params):
         (final_distrubution, vocab_score): token probability distribution final_distrubution
     '''
     temoral_attention_scores = params['temoral_attention_scores']
-    decoder_outputs  = params['decoder_outputs']
+    decoder_outputs = params['decoder_outputs']
     input_contexts = params['input_contexts']
     decoder_contexts = params['decoder_contexts']
     vocab_size = params['vocab_size']
     use_pointer = False
     if 'use_pointer' in params:
-        use_pointer=params['use_pointer']
+        use_pointer = params['use_pointer']
 
     # Variables
     attentions = tf.concat(values=[decoder_outputs, input_contexts, decoder_contexts], axis=1)
@@ -97,7 +98,7 @@ def tokenization(params):
     else:
         final_distrubution = copy_distrubution
 
-    return {"final_distrubution":final_distrubution, "vocab_score":vocab_score}
+    return {"final_distrubution": final_distrubution, "vocab_score": vocab_score}
 
 
 def test_tokenization(args):
@@ -119,7 +120,7 @@ def test_tokenization(args):
     dec_context = tf.convert_to_tensor(dec_context, np.float32)
 
     generated = tokenization({"temoral_attention_scores": attn_score, "decoder_outputs": dec_hidden_state,
-                             "input_contexts": enc_context, "decoder_contexts": dec_context, "vocab_size": vsize})
+                              "input_contexts": enc_context, "decoder_contexts": dec_context, "vocab_size": vsize})
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
