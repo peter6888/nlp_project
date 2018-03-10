@@ -5,10 +5,13 @@ import tensorflow as tf
 import numpy as np
 import argparse
 
-# below function will take parameters (self, decoder_outputs, hps, vsize, *extra_args):
+# below function will take parameters (self, decoder_outputs, hps, vsize,
+# *extra_args):
 
 
-def tokenization(encoder_attn_score, decoder_state, encoder_context, decoder_context, attn_score_size, vocab_size, use_pointer=False):
+def tokenization(encoder_attn_score, decoder_state, encoder_context,
+                 decoder_context, attn_score_size, vocab_size,
+                 use_pointer=False):
     '''
     Token generation and pointer (2.3, p.3). u_t = 1 if we
     want to pay attention to or copy the inputs and u_t = 0 if we do not. The
