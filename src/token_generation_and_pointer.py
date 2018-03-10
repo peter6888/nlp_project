@@ -6,8 +6,6 @@ import numpy as np
 import argparse
 
 # below function will take parameters (self, decoder_outputs, hps, vsize, *extra_args):
-
-
 def tokenization(temoral_attention_score, decoder_output, input_context, decoder_context, attn_score_size, vocab_size, use_pointer=False):
     '''
     Token generation and pointer (2.3, p.3). u_t = 1 if we
@@ -28,8 +26,7 @@ def tokenization(temoral_attention_score, decoder_output, input_context, decoder
         dict(final_distrubution, vocab_score): token probability distribution final_distrubution
     '''
     # Variables
-    attentions = tf.concat(
-        values=[decoder_output, input_context, decoder_context], axis=1)
+    attentions = tf.concat(values=[decoder_output, input_context, decoder_context], axis=1)
 
     # Hyperparameters
     # TODO: I am not sure whether row dim is vize or alpha_e_ti size
@@ -77,16 +74,14 @@ def tokenization(temoral_attention_score, decoder_output, input_context, decoder
 
     # Toggle pointer mechanism Equation 12
     # TODO: This can be simplified into 1 step when we decide row dims
-    # if use_pointer:
-    # Final probability distribution for output token y_t (Equation 12)
-    # TODO: Test whether I should be doing this in the TensorFlow API
-    # tf.add(pointer * copy_distrubution, (1 - pointer) * vocab_distribution)
-    vocab_dists = vocab_distribution
-    # else:
+    #if use_pointer:
+        # Final probability distribution for output token y_t (Equation 12)
+        # TODO: Test whether I should be doing this in the TensorFlow API
+    vocab_dists = vocab_distribution #tf.add(pointer * copy_distrubution, (1 - pointer) * vocab_distribution)
+    #else:
     #    vocab_dists = copy_distrubution
 
     return vocab_dists, vocab_scores
-
 
 def test_tokenization(args):
     ''' test tokenization function
@@ -113,8 +108,7 @@ def test_tokenization(args):
     dec_context = np.random.randn(batch_size, decoder_hidden_size)
     dec_context = tf.convert_to_tensor(dec_context, np.float32)
 
-    generated = tokenization(attn_score, dec_hidden_state,
-                             enc_context, dec_context, encoder_t, vsize)
+    generated = tokenization( attn_score, dec_hidden_state, enc_context, dec_context, encoder_t, vsize)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
