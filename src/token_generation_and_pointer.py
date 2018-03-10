@@ -87,7 +87,7 @@ def tokenization(encoder_attn_score, decoder_state, encoder_context, decoder_con
         pointer = tf.nn.sigmoid(z_u)
 
         # Final probability distribution for output token y_t (Equation 12)
-        tf.add(pointer * copy_distn, (1 - pointer) * vocab_dists)
+        vocab_dists = tf.add(pointer * copy_distn, (1 - pointer) * vocab_dists)
 
     # Tokenization with the token-generation softmax layer
     else:
