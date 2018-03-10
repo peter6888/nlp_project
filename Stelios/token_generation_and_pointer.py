@@ -11,8 +11,8 @@ encoder_hidden_size = 256
 decoder_t = 6
 vsize = 50000
 
-
-def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vocab_size, use_pointer=False):
+# below function will take parameters (self, decoder_outputs, hps, vsize, *extra_args):
+def tokenization(params):
     '''
     Implementation of token generation and pointer (2.3, p.3). u_t = 1 if we
     want to pay attention to or copy the inputs and u_t = 0 if we do not. The
@@ -22,23 +22,32 @@ def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vocab_size, use_pointer=False)
 
     Args:
         u_t:
-        h_d_t: decoder state tensor at timestep t
-        c_e_t: input context vector at timestep t
-        c_d_t: decoder context vector at timestep t
+        decoder_outputs: decoder state tensor at timestep t
+        input_contexts: input context vector at timestep t
+        decoder_contexts: decoder context vector at timestep t
         vocab_size: vocabulary size scalar
-        alpha_e_ti: tensor of attenion scores from equation (4)
+        temoral_attention_scores: tensor of attenion scores from equation (4)
         use_pointer: boolean, True = pointer mechanism, False = no pointer
 
     Returns:
         (final_distrubution, vocab_score): token probability distribution final_distrubution
     '''
+    temoral_attention_scores = params['temoral_attention_scores']
+    decoder_outputs  = params['decoder_outputs']
+    input_contexts = params['input_contexts']
+    decoder_contexts = params['decoder_contexts']
+    vocab_size = params['vocab_size']
+    use_pointer = False
+    if 'use_pointer' in params:
+        use_pointer=params['use_pointer']
+
     # Variables
-    attn_conc = tf.concat(values=[h_d_t, c_e_t, c_d_t], axis=1)
+    attentions = tf.concat(values=[decoder_outputs, input_contexts, decoder_contexts], axis=1)
 
     # Hyperparameters
     # TODO: I am not sure whether row dim is vize or alpha_e_ti size
-    attn_conc_size = attn_conc.get_shape()[1].value
-    attn_score_size = alpha_e_ti.get_shape()[1].value
+    attn_conc_size = attentions.get_shape()[1].value
+    attn_score_size = temoral_attention_scores.get_shape()[1].value
 
     # Initializations
     xavier_init = tf.contrib.layers.xavier_initializer()
@@ -46,7 +55,7 @@ def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vocab_size, use_pointer=False)
 
     # Tokenization with the pointer mechanism
     # Equation 10; alpha_e_ti is taken from Equation 4
-    copy_distrubution = alpha_e_ti
+    copy_distrubution = temoral_attention_scores
 
     # Tokenization with the token-generation softmax layer
     # TODO: I need to decide between vsize vs attn_score size
@@ -62,7 +71,7 @@ def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vocab_size, use_pointer=False)
     tf.get_variable_scope().reuse_variables()
 
     # Equation 9
-    vocab_score = tf.nn.xw_plus_b(attn_conc, W_out, b_out)
+    vocab_score = tf.nn.xw_plus_b(attentions, W_out, b_out)
     vocab_distribution = tf.nn.softmax(vocab_score)
 
     # Probability of using copy mechanism for decoding step t
@@ -76,19 +85,19 @@ def tokenization(alpha_e_ti, h_d_t, c_e_t, c_d_t, vocab_size, use_pointer=False)
                               initializer=zeros_init)
 
     # Equation 11
-    z_u = tf.nn.xw_plus_b(attn_conc, W_u, b_u)
-    use_pointer = tf.nn.sigmoid(z_u)
+    z_u = tf.nn.xw_plus_b(attentions, W_u, b_u)
+    pointer = tf.nn.sigmoid(z_u)
 
     # Toggle pointer mechanism Equation 12
     # TODO: This can be simplified into 1 step when we decide row dims
     if use_pointer:
         # Final probability distribution for output token y_t (Equation 12)
         # TODO: Test whether I should be doing this in the TensorFlow API
-        final_distrubution = tf.add(use_pointer * vocab_distribution, (1 - use_pointer) * copy_distrubution)
+        final_distrubution = tf.add(pointer * vocab_distribution, (1 - pointer) * copy_distrubution)
     else:
         final_distrubution = copy_distrubution
 
-    return (final_distrubution, vocab_score)
+    return {"final_distrubution":final_distrubution, "vocab_score":vocab_score}
 
 
 def test_tokenization(args):
@@ -109,12 +118,13 @@ def test_tokenization(args):
     dec_context = np.random.randn(batch_size, decoder_hidden_size)
     dec_context = tf.convert_to_tensor(dec_context, np.float32)
 
-    generated = tokenization(attn_score, dec_hidden_state,
-                             enc_context, dec_context, vsize)
+    generated = tokenization({"temoral_attention_scores": attn_score, "decoder_outputs": dec_hidden_state,
+                             "input_contexts": enc_context, "decoder_contexts": dec_context, "vocab_size": vsize})
 
     with tf.Session() as sess:
-        v = sess.run(generated)
-        print(v.shape)
+        sess.run(tf.global_variables_initializer())
+        ret = sess.run(generated)
+        print(ret["final_distrubution"].shape)
 
 
 if __name__ == "__main__":
