@@ -22,20 +22,22 @@ def tokenization(encoder_attn_score, decoder_state, encoder_context,
     Args: Dictionary params
         encoder_attn_score: tensor of attenion scores from Equation 4,
             size = [batch_size x max_enc_steps]
-        decoder_state: decoder state tensor at timestep t,
+        decoder_state: tensor of decoder state at timestep t,
             size = [batch_size x hidden_dim]
-        encoder_context: input context vector at timestep t,
+        encoder_context: tensor of input context at timestep t,
             size = [batch_size x hidden_dim]
-        decoder_context: decoder context vector at timestep t,
+        decoder_context: tensor of decoder context at timestep t,
             size = [batch_size x hidden_dim]
-        attn_score_size: the attn_score_size from hyper-parameter
-        vocab_size: vocabulary size,
+        attn_score_size: scalar attn_score_size from relevant hyper-parameter
+        vocab_size: scalar vocabulary size,
             size = [vocab_size]
         use_pointer: boolean, True = pointer mechanism, False = no pointer
 
     Returns:
-        final_dists: the final distribution of words for each timestep y_t
+        final_dists: tensor of word probability distn for each timestep y_t,
+            size = [batch_size x extended_vsize]
         vocab_scores: unnormalized scores for each word for each timestep t
+            size = [batch_size x extended_vsize]
     '''
     # Variables
     attentions = tf.concat(
