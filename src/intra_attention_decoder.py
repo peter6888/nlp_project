@@ -53,36 +53,12 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
       coverage: Coverage vector on the last step computed. None if use_coverage=False.
     """
     with variable_scope.variable_scope("attention_decoder") as scope:
-        batch_size = encoder_states.get_shape()[
-            0].value  # if this line fails, it's because the batch size isn't defined
-        attn_size = encoder_states.get_shape()[
-            2].value  # if this line fails, it's because the attention length isn't defined
+        batch_size = encoder_states.get_shape()[0].value  # if this line fails, it's because the batch size isn't defined
+        attn_size = encoder_states.get_shape()[2].value  # if this line fails, it's because the attention length isn't defined
 
         # Reshape encoder_states (need to insert a dim)
         # actual shape of encoder_states.get_shape (16, ?, 1, 512)
         encoder_states = tf.expand_dims(encoder_states, axis=2)  # now is shape (batch_size, attn_len, 1, attn_size)
-
-        # To calculate attention, we calculate
-        #   v^T tanh(W_h h_i + W_s s_t + b_attn)
-        # where h_i is an encoder state, and s_t a decoder state.
-        # attn_vec_size is the length of the vectors v, b_attn, (W_h h_i) and (W_s s_t).
-        # We set it to be equal to the size of the encoder states.
-        attention_vec_size = attn_size
-
-        # Get the weight matrix W_h and apply it to each encoder state to get (W_h h_i), the encoder features
-        W_h = variable_scope.get_variable("W_h", [1, 1, attn_size, attention_vec_size])
-        encoder_features = nn_ops.conv2d(encoder_states, W_h, [1, 1, 1, 1],
-                                         "SAME")  # shape (batch_size,attn_length,1,attention_vec_size)
-
-        # Get the weight vectors v and w_c (w_c is for coverage)
-        v = variable_scope.get_variable("v", [attention_vec_size])
-        if use_coverage:
-            with variable_scope.variable_scope("coverage"):
-                w_c = variable_scope.get_variable("w_c", [1, 1, 1, attention_vec_size])
-
-        if prev_coverage is not None:  # for beam search mode with coverage
-            # reshape from (batch_size, attn_length) to (batch_size, attn_len, 1, 1)
-            prev_coverage = tf.expand_dims(tf.expand_dims(prev_coverage, 2), 3)
 
         def intra_temporal_attention(decoder_states):
             '''
@@ -94,7 +70,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             decoder_state = decoder_states[-1][1]  # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
             decoder_hidden_vec_size = decoder_state.get_shape()[1].value
             encoder_hidden_vec_size = encoder_states.get_shape()[3].value
-            # tf.logging.info("hidden vector size - encoder:{}, decoder:{}".format(encoder_hidden_vec_size, decoder_hidden_vec_size)) # encoder:512, decoder:256
 
             with variable_scope.variable_scope("IT_Attention"):
                 # Intra-Temporal Attention
