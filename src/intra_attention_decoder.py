@@ -19,6 +19,7 @@
 """This file defines the decoder"""
 
 import tensorflow as tf
+import argparse
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
@@ -144,17 +145,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             :return: context vector, attention distribution
             '''
 
-            def masked_attention(e):
-                '''
-                Apply enc_padding_mask on encoder attention, and re-normalized it
-                :param e: Original attention score.
-                :return: attn_dist: masked attention score
-                '''
-                attn_dist = e
-                attn_dist *= enc_padding_mask  # apply mask
-                masked_sums = tf.reduce_sum(attn_dist, axis=1)  # shape (batch_size)
-                return attn_dist / tf.reshape(masked_sums, [-1, 1])  # re-normalize
-
             temporal_attention = intra_temporal_attention(decoder_states)
             decoder_attention = intra_decoder_attention(decoder_states)
 
@@ -168,7 +158,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             else:
                 decoder_context = tf.zeros(shape=[decoder_attention.get_shape().as_list()[0], decoder_states[-1][1].get_shape().as_list()[1]])
             # Calculate attention distribution
-            attn_dist = masked_attention(temporal_attention)  # To-do: 2.3 a different way to caculate the distribution
+            attn_dist = masked_attention(temporal_attention, enc_padding_mask)  # To-do: 2.3 a different way to caculate the distribution
             context_vector = temporal_context
 
             return context_vector, attn_dist, decoder_context, coverage
@@ -253,6 +243,17 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
 
         return decoder_rets
 
+def masked_attention(e, enc_padding_mask):
+    '''
+    Apply enc_padding_mask on encoder attention, and re-normalized it
+    :param e: Original attention score.
+    :param enc_padding_mask: the mask
+    :return: attn_dist: masked attention score
+    '''
+    attn_dist = e
+    attn_dist *= enc_padding_mask  # apply mask
+    masked_sums = tf.reduce_sum(attn_dist, axis=1)  # shape (batch_size)
+    return attn_dist / tf.reshape(masked_sums, [-1, 1])  # re-normalize
 
 def linear(args, output_size, bias, bias_start=0.0, scope=None):
     """Linear map: sum_i(args[i] * W[i]), where W[i] is a variable.
@@ -304,3 +305,38 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
         bias_term = tf.get_variable(
             "Bias", [output_size], initializer=tf.constant_initializer(bias_start))
     return res + bias_term
+
+############ The unit tests ###############
+def test_attention_mask(args):
+    '''
+    Unit test for attention mask
+    '''
+    batch_size = 4
+    vector_size = 3
+    old_attn = tf.random_normal(shape=[batch_size, vector_size])
+    mask = tf.constant([1.0, 1.0, 0])
+    new_attn = masked_attention(old_attn, mask)
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        _new_attn, _mask, _old_attn = sess.run([new_attn, mask, old_attn])
+        print("old_attn---")
+        print(_old_attn)
+        print("mask----")
+        print(_mask)
+        print("new_attn---")
+        print(_new_attn)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Test tokenization for matching parameter dimensions')
+    subparsers = parser.add_subparsers()
+
+    command_parser = subparsers.add_parser(
+        'test1', help='Test attention mask')
+    command_parser.set_defaults(func=test_attention_mask)
+
+    ARGS = parser.parse_args()
+    if not hasattr(ARGS, 'func'):
+        parser.print_help()
+    else:
+        ARGS.func(ARGS)
