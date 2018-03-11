@@ -66,7 +66,7 @@ tf.app.flags.DEFINE_float('trunc_norm_init_std', 1e-4, 'std of trunc norm init, 
 tf.app.flags.DEFINE_float('max_grad_norm', 2.0, 'for gradient clipping')
 
 # Pointer-generator or baseline model
-tf.app.flags.DEFINE_boolean('pointer_gen', True, 'If True, use pointer-generator model. If False, use baseline model.')
+tf.app.flags.DEFINE_boolean('pointer_gen', False, 'If True, use pointer-generator model. If False, use baseline model.')
 
 # The Deep Reinforced Model
 tf.app.flags.DEFINE_integer('attention_model', 1, '0-Pointer-generator, 1-Intra-Temporal Attention.')
