@@ -141,21 +141,23 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             with variable_scope.variable_scope("ID_Attention"):
                 # Intra-Decoder Attention
                 # W_d_attn for h_d (hidden decoder vectors) and h_d (hidden decoder vectors)
-                W_d_attn = tf.get_variable('W_d_attn', shape=(1, 1, decoder_hidden_vec_size, decoder_hidden_vec_size), \
+                W_d_attn = tf.get_variable('W_d_attn', shape=(decoder_hidden_vec_size, decoder_hidden_vec_size), \
                                            initializer=tf.contrib.layers.xavier_initializer())
                 decoder_T = len(decoder_states)
 
                 if decoder_T > 1:
                     # Equation (6)
-                    decoder_states_ex = tf.expand_dims(decoder_states_stack, axis=2)
-                    decoder_states_dot_W = nn_ops.conv2d(decoder_states_ex, W_d_attn, [1, 1, 1, 1],
-                                                         "SAME")  # shape (batch_size,?,1,decoder_hidden_vec_size)
-                    e = tf.einsum("ijkl,jl->ji", decoder_states_dot_W, decoder_state)
+                    # tf.einsum implementation
+                    # return shape [T, batch_size, hidden_state_size]
+                    decoder_states_dot_W = tf.einsum("ij,tbi->tbj", W_d_attn, decoder_states_stack)
+                    # return shape [batch_size, T]
+                    e = tf.einsum("tbi,bi->bt", decoder_states_dot_W, decoder_state)
+
                     # Equation (7)
-                    denominator = tf.reduce_sum(tf.exp(e[:-1, :]), axis=0)  # ignore the last e
+                    denominator = tf.reduce_sum(tf.exp(e[:, :-1]), axis=1, keep_dims=True)  # ignore the last e
                     attn_score = tf.divide(tf.exp(e), denominator)  # shape (batch_size, decoder_T)
                 else:
-                    attn_score = tf.zeros([batch_size, decoder_T])
+                    attn_score = tf.zeros([batch_size, 1])
 
                 return attn_score
 
@@ -182,10 +184,10 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             # print(temporal_context.get_shape())--> (16, 512)
             # Equation (8) - result has shape (batch_size, decoder_hidden_size)
             if len(decoder_states) > 1:
-                decoder_context = tf.einsum('ijk,ji->jk', decoder_states_stack[:, :-1, :],
-                                            decoder_attention[:-1, :])  # ignore the last e
+                decoder_context = tf.einsum('ijk,ji->jk', decoder_states_stack[:-1, :, :],
+                                            decoder_attention[:, :-1])  # ignore the last e
             else:
-                decoder_context = tf.zeros(shape=[decoder_attention.get_shape().as_list()[0]-1, decoder_states[-1][1].get_shape().as_list()[1]])
+                decoder_context = tf.zeros(shape=[decoder_attention.get_shape().as_list()[0], decoder_states[-1][1].get_shape().as_list()[1]])
             # Calculate attention distribution
             attn_dist = masked_attention(temporal_attention)  # To-do: 2.3 a different way to caculate the distribution
             context_vector = temporal_context
@@ -268,9 +270,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         # extra returns for Socher model
         decoder_rets["temoral_attention_scores"] = temoral_attention_scores
         decoder_rets["input_contexts"] = input_contexts
-
-        if len(decoder_contexts) > 0:
-            decoder_contexts.insert(0, tf.zeros_like(decoder_contexts[-1])) #append left with zeros
         decoder_rets["decoder_contexts"] = decoder_contexts
 
         return decoder_rets
