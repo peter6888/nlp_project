@@ -181,10 +181,11 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             temporal_context = tf.squeeze(tf.einsum('ijkl,ij->ikl', encoder_states, temporal_attention))
             # print(temporal_context.get_shape())--> (16, 512)
             # Equation (8) - result has shape (batch_size, decoder_hidden_size)
-            decoder_context = tf.zeros_like(decoder_states_stack[-1])
             if len(decoder_states) > 1:
                 decoder_context = tf.einsum('ijk,ji->jk', decoder_states_stack[:, :-1, :],
                                             decoder_attention[:-1, :])  # ignore the last e
+            else:
+                decoder_context = tf.zeros(shape=[decoder_attention.get_shape().as_list()[0]-1, decoder_states[-1][1].get_shape().as_list()[1]])
             # Calculate attention distribution
             attn_dist = masked_attention(temporal_attention)  # To-do: 2.3 a different way to caculate the distribution
             context_vector = temporal_context
@@ -192,7 +193,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             return context_vector, attn_dist, decoder_context, coverage
 
         tf.logging.info("Using Intra Temporal + Decoder Attention Model")
-        attention = hybrid_attention
         eti = []  # The eti in equation (1), eti is a list length of decoder_steps_length, and each eti[t] is a list of length encoder_steps_length
         # eti and ett does NOT share same weight
 
@@ -211,7 +211,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         context_vector.set_shape([None, attn_size])  # Ensure the second shape of attention vectors is set.
         if initial_state_attention:  # true in decode mode
             # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
-            context_vector, _, _, coverage = hybrid_attention([initial_state],
+            context_vector, _, decoder_context, coverage = hybrid_attention([initial_state],
                                                     coverage)  # in decode mode, this is what updates the coverage vector
 
         for i, inp in enumerate(decoder_inputs):
@@ -238,11 +238,10 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             if i == 0 and initial_state_attention:  # always true in decode mode
                 with variable_scope.variable_scope(variable_scope.get_variable_scope(),
                                                    reuse=True):  # you need this because you've already run the initial attention(...) call
-                    context_vector, attn_dist, _, _ = hybrid_attention(decoder_states, coverage)  # don't allow coverage to update
+                    context_vector, attn_dist, decoder_context, _ = hybrid_attention(decoder_states, coverage)  # don't allow coverage to update
             else:
                 context_vector, attn_dist, decoder_context, coverage = hybrid_attention(decoder_states, coverage)
-                if i > 0:
-                    decoder_contexts.append(decoder_context)
+            decoder_contexts.append(decoder_context)
             attn_dists.append(attn_dist)
             temoral_attention_scores.append(attn_dist)
             input_contexts.append(context_vector)
@@ -270,7 +269,8 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         decoder_rets["temoral_attention_scores"] = temoral_attention_scores
         decoder_rets["input_contexts"] = input_contexts
 
-        decoder_contexts.insert(0, tf.zeros_like(decoder_contexts[-1])) #append left with zeros
+        if len(decoder_contexts) > 0:
+            decoder_contexts.insert(0, tf.zeros_like(decoder_contexts[-1])) #append left with zeros
         decoder_rets["decoder_contexts"] = decoder_contexts
 
         return decoder_rets
