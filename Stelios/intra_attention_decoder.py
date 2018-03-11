@@ -168,7 +168,8 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
 
         def intra_decoder_attention(decoder_states):
             '''
-            Get Intra-Decoder Attention Score. Refs to original paper section 2.2 https://arxiv.org/abs/1705.04304
+            Get Intra-Decoder Attention Score. Refs to original paper section
+            2.2 https://arxiv.org/abs/1705.04304
             :param decoder_state:
             :param coverage: None
             :return:attention score with shape [batch_size, T]
