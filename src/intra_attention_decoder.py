@@ -145,8 +145,12 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             '''
 
             def masked_attention(e):
-                """Take softmax of e then apply enc_padding_mask and re-normalize"""
-                attn_dist = nn_ops.softmax(e)  # take softmax. shape (batch_size, attn_length)
+                '''
+                Apply enc_padding_mask on encoder attention, and re-normalized it
+                :param e: Original attention score.
+                :return: attn_dist: masked attention score
+                '''
+                attn_dist = e
                 attn_dist *= enc_padding_mask  # apply mask
                 masked_sums = tf.reduce_sum(attn_dist, axis=1)  # shape (batch_size)
                 return attn_dist / tf.reshape(masked_sums, [-1, 1])  # re-normalize
