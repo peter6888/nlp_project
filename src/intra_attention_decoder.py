@@ -118,8 +118,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             '''
 
             temporal_attention = intra_temporal_attention(decoder_states)
-            decoder_attention = intra_decoder_attention(
-                decoder_states, decoder_states_stack)
+            decoder_attention = intra_decoder_attention(decoder_states_stack)
 
             # Equation (5) - result has shape (batch_size, 1, encoder_hidden_size) --> After squeeze (batch_size, encoder_hidden_size)
             temporal_context = tf.squeeze(
@@ -207,16 +206,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
                     p_gen = tf.sigmoid(p_gen)
                     p_gens.append(p_gen)
 
-            # {0-Pointer-Attention, 1-Intra-Temporal-Attention, 2-.., 3-..}
-            if hps.attention_model == 1:
-                # Concatenate the cell_output (= decoder state) and the context vector, and pass them through a linear layer
-                # This is V[s_t, h*_t] + b in the paper
-                with variable_scope.variable_scope("AttnOutputProjection"):
-                    output = linear([cell_output] + [context_vector],
-                                    cell.output_size, True)
-                outputs.append(output)
-            else:
-                outputs.append([cell_output])
+            outputs.append(cell_output)
 
         # If using coverage, reshape it
         if coverage is not None:
@@ -233,7 +223,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         return decoder_rets
 
 
-def intra_decoder_attention(decoder_states, decoder_states_stack):
+def intra_decoder_attention(decoder_states_stack):
     '''
     Get Intra-Decoder Attention Score. Refs to original paper section 2.2 https://arxiv.org/abs/1705.04304
     :param decoder_state:
@@ -241,8 +231,9 @@ def intra_decoder_attention(decoder_states, decoder_states_stack):
     :return:attention score with shape [batch_size, T]
     '''
     batch_size = decoder_states_stack[-1].get_shape()[0].value
+    decoder_T = decoder_states_stack.get_shape()[0]
     # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
-    decoder_state = decoder_states[-1][1]
+    decoder_state = decoder_states_stack[-1]
     decoder_hidden_vec_size = decoder_state.get_shape()[1].value
 
     with variable_scope.variable_scope("ID_Attention"):
@@ -250,7 +241,6 @@ def intra_decoder_attention(decoder_states, decoder_states_stack):
         # W_d_attn for h_d (hidden decoder vectors) and h_d (hidden decoder vectors)
         W_d_attn = tf.get_variable('W_d_attn', shape=(decoder_hidden_vec_size, decoder_hidden_vec_size),
                                    initializer=tf.contrib.layers.xavier_initializer())
-        decoder_T = len(decoder_states)
 
         if decoder_T > 1:
             # Equation (6)
@@ -339,8 +329,6 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
     return res + bias_term
 
 ############ The unit tests ###############
-
-
 def test_intra_decoder_attention(args):
     #(decoder_states, decoder_states_stack):
     '''
@@ -363,13 +351,12 @@ def test_intra_decoder_attention(args):
     _, decoder_states_list = map(list, zip(*decoder_states))
     decoder_states_stack = tf.stack(decoder_states_list)
 
-    attn = intra_decoder_attention(decoder_states, decoder_states_stack)
+    attn = intra_decoder_attention(decoder_states_stack)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         _attn = sess.run(attn)
         print(_attn)
-
 
 '''
 --first run result---
