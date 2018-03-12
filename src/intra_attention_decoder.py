@@ -125,8 +125,10 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             # print(temporal_context.get_shape())--> (16, 512)
             # Equation (8) - result has shape (batch_size, decoder_hidden_size)
             if len(decoder_states) > 1:
-                decoder_context = tf.einsum('ijk,ji->jk', decoder_states_stack[:-1, :, :],
-                                            decoder_attention)  # ignore the last e
+                decoder_context = tf.einsum('ijk,ji->jk',
+                                            decoder_states_stack[:-1, :, :],
+                                            decoder_attention)
+                                            # ignore the last e
             else:
                 decoder_context = tf.zeros(shape=[decoder_attention.get_shape().as_list()[
                                            0], decoder_states[-1][1].get_shape().as_list()[1]])
@@ -159,8 +161,9 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         if initial_state_attention:  # true in decode mode
             decoder_states_stack = tf.stack([[initial_state]])
             # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
-            context_vector, _, decoder_context, coverage = hybrid_attention([initial_state],
-                                                                            coverage)  # in decode mode, this is what updates the coverage vector
+            context_vector, _, decoder_context, coverage = hybrid_attention(
+                [initial_state], coverage)
+            # in decode mode, this is what updates the coverage vector
 
         for i, inp in enumerate(decoder_inputs):
             tf.logging.info(
@@ -186,8 +189,10 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
 
             # Run the attention mechanism.
             if i == 0 and initial_state_attention:  # always true in decode mode
-                with variable_scope.variable_scope(variable_scope.get_variable_scope(),
-                                                   reuse=True):  # you need this because you've already run the initial attention(...) call
+                with variable_scope.variable_scope(
+                        variable_scope.get_variable_scope(), reuse=True):
+                    # you need this because you've already run the initial attention(...) call
+
                     context_vector, attn_dist, decoder_context, _ = hybrid_attention(
                         decoder_states, coverage)  # don't allow coverage to update
             else:
