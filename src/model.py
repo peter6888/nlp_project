@@ -396,8 +396,11 @@ class SummarizationModel(object):
                 # reduce the dimention for input_contexts
                 input_context = self._reduce_context(input_contexts[i])
 
-                vocab_dist, vocab_score = tokenization(temoral_attention_scores[i], decoder_outputs[i], input_context, decoder_contexts[i],
-                                                       self._hps.max_enc_steps, vocab_size)
+                vocab_dist, vocab_score = tokenization(
+                    temoral_attention_scores[i], decoder_outputs[i],
+                    input_context, decoder_contexts[i],
+                    self._hps.max_enc_steps, vocab_size
+                    )
 
                 vocab_dists.append(vocab_dist)
                 vocab_scores.append(vocab_score)
