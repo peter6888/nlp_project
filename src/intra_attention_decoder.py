@@ -154,6 +154,9 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         # don't need initial_state for caculation
         # decoder_states.append(state)
         coverage = prev_coverage  # initialize coverage to None or whatever was passed in
+        # Stelios to keep hidden states h_t
+        dec_hidden_states = []
+
         context_vector = array_ops.zeros([batch_size, attn_size])
         # Ensure the second shape of attention vectors is set.
         context_vector.set_shape([None, attn_size])
@@ -184,15 +187,20 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             decoder_states_stack = tf.stack(decoder_states_list)
             # print(decoder_states_stack.get_shape()) #(T,batch_size, decoder_hidden_size)
 
+            # Compile cell states
+            dec_hidden_states.append(cell_output)
+
             # Run the attention mechanism.
             if i == 0 and initial_state_attention:  # always true in decode mode
                 with variable_scope.variable_scope(variable_scope.get_variable_scope(),
                                                    reuse=True):  # you need this because you've already run the initial attention(...) call
+                    # Stelios: changed to dec_hidden_states from decoder_states
                     context_vector, attn_dist, decoder_context, _ = hybrid_attention(
-                        decoder_states, coverage)  # don't allow coverage to update
+                        dec_hidden_states, coverage)  # don't allow coverage to update
             else:
+                # Stelios: changed to dec_hidden_states from decoder_states
                 context_vector, attn_dist, decoder_context, coverage = hybrid_attention(
-                    decoder_states, coverage)
+                    dec_hidden_states, coverage)
             decoder_contexts.append(decoder_context)
             attn_dists.append(attn_dist)
             temoral_attention_scores.append(attn_dist)
@@ -206,6 +214,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
                     p_gen = tf.sigmoid(p_gen)
                     p_gens.append(p_gen)
 
+            # Append hidden states
             outputs.append(cell_output)
 
         # If using coverage, reshape it
@@ -246,7 +255,8 @@ def intra_decoder_attention(decoder_states_stack):
             # Equation (6)
             # tf.einsum implementation
             # return shape [T-1, batch_size, hidden_state_size]
-            decoder_states_dot_W = tf.einsum("ij,tbi->tbj", W_d_attn, decoder_states_stack[:-1])
+            decoder_states_dot_W = tf.einsum(
+                "ij,tbi->tbj", W_d_attn, decoder_states_stack[:-1])
             # return shape [batch_size, T-1]
             e = tf.einsum("tbi,bi->bt", decoder_states_dot_W, decoder_state)
 
@@ -326,6 +336,8 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
     return res + bias_term
 
 ############ The unit tests ###############
+
+
 def test_intra_decoder_attention(args):
     #(decoder_states, decoder_states_stack):
     '''
@@ -354,6 +366,7 @@ def test_intra_decoder_attention(args):
         sess.run(tf.global_variables_initializer())
         _attn = sess.run(attn)
         print(_attn)
+
 
 '''
 --first run result---
