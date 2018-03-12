@@ -306,10 +306,10 @@ class SummarizationModel(object):
             # for Paulus, Xiong and Socher model
             # {0-Pointer-Attention, 1-Intra-Temporal-Attention, 2-.., 3-..}
             if hps.attention_model == 1:
-                temoral_attention_scores = decoder_rets["temoral_attention_scores"]
+                temporal_attention_scores = decoder_rets["temporal_attention_scores"]
                 input_contexts = decoder_rets["input_contexts"]
                 decoder_contexts = decoder_rets["decoder_contexts"]
-                params = {"temoral_attention_scores": temoral_attention_scores, "decoder_outputs": decoder_outputs,
+                params = {"temporal_attention_scores": temporal_attention_scores, "decoder_outputs": decoder_outputs,
                           "input_contexts": input_contexts, "decoder_contexts": decoder_contexts, "vocab_size": vsize}
 
                 self.caculate_baseline_dist = self._calc_baseline_dists_paulus
@@ -379,7 +379,7 @@ class SummarizationModel(object):
             self._topk_log_probs = tf.log(topk_probs)
 
     def _calc_baseline_dists_paulus(self, calc_params):
-        temoral_attention_scores = calc_params['temoral_attention_scores']
+        temporal_attention_scores = calc_params['temporal_attention_scores']
         decoder_outputs = calc_params['decoder_outputs']
         input_contexts = calc_params['input_contexts']
         decoder_contexts = calc_params['decoder_contexts']
@@ -397,10 +397,10 @@ class SummarizationModel(object):
                 input_context = self._reduce_context(input_contexts[i])
 
                 vocab_dist, vocab_score = tokenization(
-                    temoral_attention_scores[i], decoder_outputs[i],
+                    temporal_attention_scores[i], decoder_outputs[i],
                     input_context, decoder_contexts[i],
                     self._hps.max_enc_steps, vocab_size
-                    )
+                )
 
                 vocab_dists.append(vocab_dist)
                 vocab_scores.append(vocab_score)
