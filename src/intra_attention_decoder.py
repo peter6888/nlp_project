@@ -68,31 +68,51 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
         def hybrid_attention(decoder_states, coverage=None):
             '''
             The hybrid attention model which concat Intra Temporal Attention and Intra-Decoder Attention to get context and distrubution
-            :param decoder_states: decoder hidden states shape list([batch_size, ])
-            :param coverage:
-            :return: context vector, attention distribution
+            Args:
+                decoder_states: list of decoder hidden states shape,
+                    size = list([batch_size, hidden_dim])
+                coverage: initialized to None or a previous coverage tensor
+            Returns:
+                context vector: tensor of weighed encoder hidden states,
+                    size = [batch_size x hidden_dims]
+                attn_dist: context vector reweighted to account for masking
+                    size = [batch_size x hidden_dims]
+                decoder context: tensor of weighted decoder hidden states,
+                    size = [batch_size x hidden_dims]
+                coverage: as per Abi's code to prevent repetition
             '''
 
-            temporal_attention = intra_temporal_attention(decoder_states, encoder_states, eti)
+            temporal_attention = intra_temporal_attention(decoder_states,
+                                                          encoder_states, eti)
             decoder_attention = intra_decoder_attention(decoder_states_stack)
 
-            # Equation (5) - result has shape (batch_size, 1, encoder_hidden_size) --> After squeeze (batch_size, encoder_hidden_size)
+            # Calculate encoder distribution
+            # Mask padded sequences
+            attn_dist = masked_attention(temporal_attention, enc_padding_mask)
+
+            # Equation (5)
+            # encoder_states: batch_size x attn_length x 1 x attn_size
+            # attn_dist: batch_size x attn_length
+            # Result has shape (batch_size, 1, encoder_hidden_size)
+            # --> After squeeze (batch_size, encoder_hidden_size)
             temporal_context = tf.squeeze(
-                tf.einsum('ijkl,ij->ikl', encoder_states, temporal_attention))
+                tf.einsum('btkh,bt->bkh', encoder_states, attn_dist))
             # print(temporal_context.get_shape())--> (16, 512)
-            # Equation (8) - result has shape (batch_size, decoder_hidden_size)
+            context_vector = temporal_context
+
+            # Equation (8)
+            # decoder_states_stack: T x batch_size x decoder_hidden_size
+            # decoder_attention: batch_size x T - 1
+            # Result has shape (batch_size, decoder_hidden_size)
             if len(decoder_states) > 1:
-                decoder_context = tf.einsum('ijk,ji->jk',
+                decoder_context = tf.einsum('tbh,bt->bh',
                                             decoder_states_stack[:-1, :, :],
                                             decoder_attention)
                                             # ignore the last e
             else:
-                decoder_context = tf.zeros(shape=[decoder_attention.get_shape().as_list()[
-                                           0], decoder_states[-1][1].get_shape().as_list()[1]])
-            # Calculate attention distribution
-            # To-do: 2.3 a different way to caculate the distribution
-            attn_dist = masked_attention(temporal_attention, enc_padding_mask)
-            context_vector = temporal_context
+                decoder_context = tf.zeros(
+                    shape=[decoder_attention.get_shape().as_list()[0],
+                    decoder_states[-1][1].get_shape().as_list()[1]])
 
             return context_vector, attn_dist, decoder_context, coverage
 
@@ -155,15 +175,15 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
                         variable_scope.get_variable_scope(), reuse=True):
                     # you need this because you've already run the initial attention(...) call
 
-                    context_vector, attn_dist, decoder_context, _ = hybrid_attention(
-                        decoder_states, coverage)  # don't allow coverage to update
+                    context_vector, attn_dist, decoder_context, _ = hybrid_attention(decoder_states, coverage)
+                    # don't allow coverage to update
             else:
-                context_vector, attn_dist, decoder_context, coverage = hybrid_attention(
-                    decoder_states, coverage)
-            decoder_contexts.append(decoder_context)
+                context_vector, attn_dist, decoder_context, coverage = hybrid_attention(decoder_states, coverage)
+
             attn_dists.append(attn_dist)
             temporal_attention_scores.append(attn_dist)
             input_contexts.append(context_vector)
+            decoder_contexts.append(decoder_context)
 
             # Calculate p_gen
             if pointer_gen:
@@ -180,10 +200,11 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
         if coverage is not None:
             coverage = array_ops.reshape(coverage, [batch_size, -1])
 
-        # common part of return
+        # Common part of return
         decoder_rets = {"outputs": outputs, "state": state,
-                        "attn_dists": attn_dists, "p_gens": p_gens, "coverage": coverage}
-        # extra returns for Socher model
+                        "attn_dists": attn_dists, "p_gens": p_gens,
+                        "coverage": coverage}
+        # Extra returns for Socher model
         decoder_rets["temporal_attention_scores"] = temporal_attention_scores
         decoder_rets["input_contexts"] = input_contexts
         decoder_rets["decoder_contexts"] = decoder_contexts
@@ -193,29 +214,45 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
 def intra_temporal_attention(decoder_states, encoder_states, eti_list):
     '''
     Get Intra-Temporal Attention Score. Refs to original paper section 2.1 https://arxiv.org/abs/1705.04304
-    :param decoder_states:
-    :param encoder_states:
-    :param eti_list: the eti in equation (1)
+    :param decoder_state:
+    :param coverage: None
     :return:attention score
     '''
-    decoder_state = decoder_states[-1][1]  # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
+    # Extract hidden state from list and tuple of decoder states
+    decoder_state = decoder_states[-1][1]
+    # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
+
     decoder_hidden_vec_size = decoder_state.get_shape()[1].value
     encoder_hidden_vec_size = encoder_states.get_shape()[3].value
 
+    # Intra-Temporal Attention
     with variable_scope.variable_scope("IT_Attention"):
-        # Intra-Temporal Attention
-        # Equation (2) W_e_attn for h_d (hidden decoder vectors) and h_e (hidden encoder vectors)
-        W_e_attn = tf.get_variable('W_e_attn', shape=(1, 1, encoder_hidden_vec_size, decoder_hidden_vec_size),
-                                   initializer=tf.contrib.layers.xavier_initializer())
+
+        # Equation (2) W_e_attn for h_d (hidden decoder vectors) and
+        # h_e (hidden encoder vectors)
+        W_e_attn = tf.get_variable('W_e_attn',
+                                   shape=(1, 1,
+                                          encoder_hidden_vec_size,
+                                          decoder_hidden_vec_size),
+                initializer=tf.contrib.layers.xavier_initializer())
+
         decoder_T = len(decoder_states)
-        encoder_states_dot_W = nn_ops.conv2d(encoder_states, W_e_attn, [1, 1, 1, 1],
-                                             "SAME")  # shape (batch_size,?,1,decoder_hidden_vec_size)
-        # caculate eti[decoder_T - 1], which is a list have length len(encoder_states)
-        # tf.logging.info("encoder_states_dot_W.shape {}".format(encoder_states_dot_W.get_shape())) #encoder_states_dot_W.shape (16, ?, 1, 256)
-        decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1),
-                                       1)  # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
+
+        encoder_states_dot_W = nn_ops.conv2d(encoder_states, W_e_attn,
+                                            [1, 1, 1, 1],
+                                            "SAME")
+        # shape (batch_size,?,1,decoder_hidden_vec_size)
+
+        # tf.logging.info("encoder_states_dot_W.shape {}".format(encoder_states_dot_W.get_shape()))
+        # encoder_states_dot_W.shape (16, len_attn, 1, 256)
+
+        decoder_state = tf.expand_dims(
+            tf.expand_dims(decoder_state, 1), 1)
+        # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
+
         e = math_ops.reduce_sum(
             decoder_state * encoder_states_dot_W, [2, 3])
+        # shape: (batch_size x attn_length)
 
         # Equation (3)
         if decoder_T == 1:
@@ -223,49 +260,57 @@ def intra_temporal_attention(decoder_states, encoder_states, eti_list):
         else:
             denominator = tf.reduce_sum(tf.exp(eti_list), axis=0)
             e_prime = tf.divide(tf.exp(e), denominator)
-        # tf.logging.info("e_prime.shape:{}".format(e_prime.get_shape())) # (batch_size, ?)
+        # tf.logging.info("e_prime.shape:{}".format(e_prime.get_shape())) # (batch_size, attn_length)
 
         # append to eti list after e_prime been calculated
         eti_list.append(e)
-        # tf.logging.info("e.shape:{}".format(e.get_shape())) # e.shape:(batch_size, ?)
+        # tf.logging.info("e.shape:{}".format(e.get_shape()))
+        # e.shape:(batch_size, ?)
 
         # Equation (4)
-        attn_score = tf.divide(e_prime, tf.reduce_sum(e_prime, axis=1, keep_dims=True))
-        # tf.logging.info("attn_score.shape:{}".format(attn_score.get_shape())) # attn_score.shape:(16, ?)
+        attn_score = tf.nn.softmax(e_prime)
+        # tf.logging.info("attn_score.shape:{}".format(attn_score.get_shape())) # attn_score.shape:(16, attn_length)
 
         return attn_score
 
 def intra_decoder_attention(decoder_states_stack):
     '''
-    Get Intra-Decoder Attention Score. Refs to original paper section 2.2 https://arxiv.org/abs/1705.04304
-    :param decoder_state:
-    :param coverage: None
-    :return:attention score with shape [batch_size, T]
+    Get Intra-Decoder Attention Score. Refs to original paper section 2.2
+    https://arxiv.org/abs/1705.04304.
+    Args:
+        decoder_states_stack: tensor of decoder hidden states
+            size: [T, batch_size, decoder_hidden_size]
+    Returns:
+        attn_score: tensor of attnetion scores alpha_d_tt (Equation 7),
+            size: [batch_size, T - 1]
     '''
     batch_size = decoder_states_stack[-1].get_shape()[0].value
     decoder_T = decoder_states_stack.get_shape()[0]
-    # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
     decoder_state = decoder_states_stack[-1]
+    # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
+
     decoder_hidden_vec_size = decoder_state.get_shape().as_list()[-1]
 
+    # Intra-Decoder Attention
     with variable_scope.variable_scope("ID_Attention"):
-        # Intra-Decoder Attention
-        # W_d_attn for h_d (hidden decoder vectors) and h_d (hidden decoder vectors)
-        W_d_attn = tf.get_variable('W_d_attn', shape=(decoder_hidden_vec_size, decoder_hidden_vec_size),
-                                   initializer=tf.contrib.layers.xavier_initializer())
+
+        # W_d_attn of Equation 6
+        W_d_attn = tf.get_variable('W_d_attn',
+            shape=(decoder_hidden_vec_size, decoder_hidden_vec_size),
+            initializer=tf.contrib.layers.xavier_initializer())
 
         if decoder_T > 1:
             # Equation (6)
-            # tf.einsum implementation
             # return shape [T-1, batch_size, hidden_state_size]
             decoder_states_dot_W = tf.einsum(
                 "ij,tbi->tbj", W_d_attn, decoder_states_stack[:-1])
-            # return shape [batch_size, T-1]
+
             e = tf.einsum("tbi,bi->bt", decoder_states_dot_W, decoder_state)
+            # return shape [batch_size, T-1]
 
             # Equation (7)
-            # shape (batch_size, decoder_T-1)
             attn_score = tf.nn.softmax(e)
+            # shape (batch_size, decoder_T-1)
         else:
             attn_score = tf.zeros([batch_size, 1])
 
@@ -275,9 +320,14 @@ def intra_decoder_attention(decoder_states_stack):
 def masked_attention(e, enc_padding_mask):
     '''
     Apply enc_padding_mask on encoder attention, and re-normalized it
-    :param e: Original attention score.
-    :param enc_padding_mask: the mask
-    :return: attn_dist: masked attention score
+    Args:
+        e: tensor of original encoder attention scores
+            size = batch_size x attn_length
+        enc_padding_mask: tensor of masks
+            size = batch_size x attn_length
+    Returns:
+        attn_dist: masked attention score,
+            size = batch_size x attn_length
     '''
     attn_dist = e
     attn_dist *= enc_padding_mask  # apply mask
