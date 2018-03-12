@@ -128,7 +128,9 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             if input_size.value is None:
                 raise ValueError(
                     "Could not infer input size from input: %s" % inp.name)
-            x = linear([inp] + [context_vector], input_size, True)
+            print("inp shape:{}".format(inp.get_shape().as_list()))
+            x = inp #linear([inp] + [context_vector], input_size, True)
+            print("x shape:{}".format(x.get_shape().as_list()))
 
             # Run the decoder RNN cell. cell_output = decoder state
             cell_output, state = cell(x, state)
@@ -473,4 +475,4 @@ if __name__ == "__main__":
     if not hasattr(ARGS, 'func'):
         parser.print_help()
     else:
-ARGS.func(ARGS)
+        ARGS.func(ARGS)
