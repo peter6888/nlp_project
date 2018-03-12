@@ -197,7 +197,8 @@ class SummarizationModel(object):
                                         initial_state_attention=(
                                             hps.mode == "decode"),
                                         pointer_gen=hps.pointer_gen, use_coverage=hps.coverage,
-                                        prev_coverage=prev_coverage, input_attention=hps.input_attention)
+                                        prev_coverage=prev_coverage, input_attention=hps.input_attention, \
+                                        use_intra_decoder_attention=hps.use_intra_decoder_attention)
 
         return rets
 
@@ -406,15 +407,6 @@ class SummarizationModel(object):
                 vocab_scores.append(vocab_score)
 
         return vocab_dists, vocab_scores
-
-    def insert_zeros_at_begin(self, old_tensor):
-        '''
-        Experiement how to insert zero for a Tensor with shape (15, 256) to (16, 256)
-        Returns:
-        '''
-        zero_tensor = tf.zeros(shape=[1, old_tensor.get_shape().as_list()[1]])
-        new_tensor = tf.concat([zero_tensor, old_tensor], axis=0)
-        return new_tensor
 
     def _calc_baseline_dist(self, calc_params):
         '''

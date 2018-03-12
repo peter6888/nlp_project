@@ -23,14 +23,14 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import variable_scope
 from attention_common import linear, masked_attention
-from attention_common import intra_decoder_attention, intra_temporal_attention
+from attention_common import intra_decoder_context, intra_temporal_attention
 
 # Note: this function is based attention_decoder
 # In the future, it would make more sense to write variants on the attention mechanism using the new seq2seq library for tensorflow 1.0: https://www.tensorflow.org/api_guides/python/contrib.seq2seq#Attention
 def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
                             enc_padding_mask, cell,
                             initial_state_attention=False, pointer_gen=True,
-                            use_coverage=False, prev_coverage=None, input_attention=1):
+                            use_coverage=False, prev_coverage=None, input_attention=1, use_intra_decoder_attention=False):
     """
     Args:
       decoder_inputs: A list of 2D Tensors [batch_size x input_size].
@@ -84,7 +84,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
 
             temporal_attention = intra_temporal_attention(decoder_states,
                                                           encoder_states, eti)
-            decoder_attention = intra_decoder_attention(decoder_states_stack)
+
 
             # Calculate encoder distribution
             # Mask padded sequences
@@ -104,15 +104,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
             # decoder_states_stack: T x batch_size x decoder_hidden_size
             # decoder_attention: batch_size x T - 1
             # Result has shape (batch_size, decoder_hidden_size)
-            if len(decoder_states) > 1:
-                decoder_context = tf.einsum('tbh,bt->bh',
-                                            decoder_states_stack[:-1, :, :],
-                                            decoder_attention)
-                                            # ignore the last e
-            else:
-                decoder_context = tf.zeros(
-                    shape=[decoder_attention.get_shape().as_list()[0],
-                    decoder_states[-1][1].get_shape().as_list()[1]])
+            decoder_context = intra_decoder_context(decoder_states_stack)
 
             return context_vector, attn_dist, decoder_context, coverage
 

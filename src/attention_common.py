@@ -121,6 +121,26 @@ def intra_decoder_attention(decoder_states_stack):
 
         return attn_score
 
+def intra_decoder_context(decoder_states_stack):
+    '''
+    :param decoder_states_stack: shape T x batch_size x decoder_hidden_size
+    :return: intra_decoder_context shape batch_size x decoder_hidden_size
+    '''
+    T, batch_size, decoder_hidden_size = decoder_states_stack.get_shape().as_list()
+    decoder_attention = intra_decoder_attention(decoder_states_stack)
+    # Equation (8)
+    # decoder_states_stack: T x batch_size x decoder_hidden_size
+    # decoder_attention: batch_size x T - 1
+    # Result has shape (batch_size, decoder_hidden_size)
+    if T > 1:
+        decoder_context = tf.einsum('tbh,bt->bh',
+                                    decoder_states_stack[:-1, :, :],
+                                    decoder_attention)
+                                    # ignore the last e
+    else:
+        decoder_context = tf.zeros(shape=[batch_size, decoder_hidden_size])
+
+    return decoder_context
 
 def masked_attention(e, enc_padding_mask):
     '''
@@ -190,6 +210,15 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
             "Bias", [output_size], initializer=tf.constant_initializer(bias_start))
     return res + bias_term
 
+def insert_zeros_at_end(old_tensor):
+    '''
+    Experiement how to insert zero for a Tensor with shape (15, 256) to (16, 256)
+    Returns:
+    '''
+    zero_tensor = tf.zeros(shape=[1, old_tensor.get_shape().as_list()[1]])
+    new_tensor = tf.concat([old_tensor, zero_tensor], axis=0)
+    return new_tensor
+
 ############ The unit tests ###############
 def test_intra_temporal_attention(args):
     batch_size = 5
@@ -253,13 +282,7 @@ def test_intra_temporal_attention(args):
       dtype=float32)]
 '''
 
-def test_intra_decoder_attention(args):
-    #(decoder_states, decoder_states_stack):
-    '''
-    decoder_states - list(Tensor)
-    :param args:
-    :return:
-    '''
+def get_decoder_states_stack():
     batch_size = 5
     max_total_time = 4
     input_vector_size = 3
@@ -275,13 +298,21 @@ def test_intra_decoder_attention(args):
     _, decoder_states_list = map(list, zip(*decoder_states))
     decoder_states_stack = tf.stack(decoder_states_list)
 
-    attn = intra_decoder_attention(decoder_states_stack)
+    return decoder_states_stack
+
+def test_intra_decoder_attention(args):
+    #(decoder_states, decoder_states_stack):
+    '''
+    decoder_states - list(Tensor)
+    :param args:
+    :return:
+    '''
+    attn = intra_decoder_attention(get_decoder_states_stack())
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         _attn = sess.run(attn)
         print(_attn)
-
 
 '''
 --first run result---
@@ -298,6 +329,28 @@ def test_intra_decoder_attention(args):
  [0.33333334 0.33333334 0.33333334]]
 '''
 
+def test_intra_decoder_context(args):
+    context = intra_decoder_context(get_decoder_states_stack())
+
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        _context = sess.run(context)
+        print("context.shape {}".format(_context.shape))
+        print(_context)
+    return
+
+def test_insert_zeros_at_end(args):
+    batch_size = 4
+    vector_size = 5
+    old_tensor = tf.random_normal(shape=(batch_size,vector_size))
+    new_tensor = insert_zeros_at_end(old_tensor)
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        _old_tensor, _new_tensor = sess.run([old_tensor, new_tensor])
+        print("Tensor before insert zero shape {}".format(_old_tensor.shape))
+        print(_old_tensor)
+        print("Tensor after insert zero {}".format(_new_tensor.shape))
+        print(_new_tensor)
 
 def test_attention_mask(args):
     '''
@@ -335,6 +388,14 @@ if __name__ == "__main__":
     command_parser = subparsers.add_parser(
         'test3', help='test intra temporal attention')
     command_parser.set_defaults(func=test_intra_temporal_attention)
+
+    command_parser = subparsers.add_parser(
+        'test4', help='test insert zero at the end of Tensor')
+    command_parser.set_defaults(func=test_insert_zeros_at_end)
+
+    command_parser = subparsers.add_parser(
+        'test5', help='test intra decoder context')
+    command_parser.set_defaults(func=test_intra_decoder_context)
 
     ARGS = parser.parse_args()
     if not hasattr(ARGS, 'func'):
