@@ -197,7 +197,7 @@ class SummarizationModel(object):
                                         initial_state_attention=(
                                             hps.mode == "decode"),
                                         pointer_gen=hps.pointer_gen, use_coverage=hps.coverage,
-                                        prev_coverage=prev_coverage)
+                                        prev_coverage=prev_coverage, input_attention=hps.input_attention)
 
         return rets
 
