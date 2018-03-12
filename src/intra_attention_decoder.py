@@ -63,51 +63,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         # now is shape (batch_size, attn_len, 1, attn_size)
         encoder_states = tf.expand_dims(encoder_states, axis=2)
 
-        def intra_temporal_attention(decoder_states):
-            '''
-            Get Intra-Temporal Attention Score. Refs to original paper section 2.1 https://arxiv.org/abs/1705.04304
-            :param decoder_state:
-            :param coverage: None
-            :return:attention score
-            '''
-            decoder_state = decoder_states[-1][1]  # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
-            decoder_hidden_vec_size = decoder_state.get_shape()[1].value
-            encoder_hidden_vec_size = encoder_states.get_shape()[3].value
-
-            with variable_scope.variable_scope("IT_Attention"):
-                # Intra-Temporal Attention
-                # Equation (2) W_e_attn for h_d (hidden decoder vectors) and h_e (hidden encoder vectors)
-                W_e_attn = tf.get_variable('W_e_attn', shape=(1, 1, encoder_hidden_vec_size, decoder_hidden_vec_size),
-                                           initializer=tf.contrib.layers.xavier_initializer())
-                decoder_T = len(decoder_states)
-                encoder_states_dot_W = nn_ops.conv2d(encoder_states, W_e_attn, [1, 1, 1, 1],
-                                                     "SAME")  # shape (batch_size,?,1,decoder_hidden_vec_size)
-                # caculate eti[decoder_T - 1], which is a list have length len(encoder_states)
-                # tf.logging.info("encoder_states_dot_W.shape {}".format(encoder_states_dot_W.get_shape())) #encoder_states_dot_W.shape (16, ?, 1, 256)
-                decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1),
-                                               1)  # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
-                e = math_ops.reduce_sum(
-                    decoder_state * encoder_states_dot_W, [2, 3])
-
-                # Equation (3)
-                if decoder_T == 1:
-                    e_prime = tf.exp(e)
-                else:
-                    denominator = tf.reduce_sum(tf.exp(eti), axis=0)
-                    e_prime = tf.divide(tf.exp(e), denominator)
-                # tf.logging.info("e_prime.shape:{}".format(e_prime.get_shape())) # (batch_size, ?)
-
-                # append to eti list after e_prime been calculated
-                eti.append(e)
-                # tf.logging.info("e.shape:{}".format(e.get_shape())) # e.shape:(batch_size, ?)
-
-                # Equation (4)
-                attn_score = tf.divide(e_prime, tf.reduce_sum(
-                    e_prime, axis=1, keep_dims=True))
-                # tf.logging.info("attn_score.shape:{}".format(attn_score.get_shape())) # attn_score.shape:(16, ?)
-
-                return attn_score
-
         def hybrid_attention(decoder_states, coverage=None):
             '''
             The hybrid attention model which concat Intra Temporal Attention and Intra-Decoder Attention to get context and distrubution
@@ -116,7 +71,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             :return: context vector, attention distribution
             '''
 
-            temporal_attention = intra_temporal_attention(decoder_states)
+            temporal_attention = intra_temporal_attention(decoder_states, encoder_states, eti)
             decoder_attention = intra_decoder_attention(decoder_states_stack)
 
             # Equation (5) - result has shape (batch_size, 1, encoder_hidden_size) --> After squeeze (batch_size, encoder_hidden_size)
@@ -176,7 +131,9 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             if input_size.value is None:
                 raise ValueError(
                     "Could not infer input size from input: %s" % inp.name)
-            x = linear([inp] + [context_vector], input_size, True)
+            print("inp shape:{}".format(inp.get_shape().as_list()))
+            x = inp #linear([inp] + [context_vector], input_size, True)
+            print("x shape:{}".format(x.get_shape().as_list()))
 
             # Run the decoder RNN cell. cell_output = decoder state
             cell_output, state = cell(x, state)
@@ -228,6 +185,50 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
 
         return decoder_rets
 
+def intra_temporal_attention(decoder_states, encoder_states, eti_list):
+    '''
+    Get Intra-Temporal Attention Score. Refs to original paper section 2.1 https://arxiv.org/abs/1705.04304
+    :param decoder_states:
+    :param encoder_states:
+    :param eti_list: the eti in equation (1)
+    :return:attention score
+    '''
+    decoder_state = decoder_states[-1][1]  # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
+    decoder_hidden_vec_size = decoder_state.get_shape()[1].value
+    encoder_hidden_vec_size = encoder_states.get_shape()[3].value
+
+    with variable_scope.variable_scope("IT_Attention"):
+        # Intra-Temporal Attention
+        # Equation (2) W_e_attn for h_d (hidden decoder vectors) and h_e (hidden encoder vectors)
+        W_e_attn = tf.get_variable('W_e_attn', shape=(1, 1, encoder_hidden_vec_size, decoder_hidden_vec_size),
+                                   initializer=tf.contrib.layers.xavier_initializer())
+        decoder_T = len(decoder_states)
+        encoder_states_dot_W = nn_ops.conv2d(encoder_states, W_e_attn, [1, 1, 1, 1],
+                                             "SAME")  # shape (batch_size,?,1,decoder_hidden_vec_size)
+        # caculate eti[decoder_T - 1], which is a list have length len(encoder_states)
+        # tf.logging.info("encoder_states_dot_W.shape {}".format(encoder_states_dot_W.get_shape())) #encoder_states_dot_W.shape (16, ?, 1, 256)
+        decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1),
+                                       1)  # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
+        e = math_ops.reduce_sum(
+            decoder_state * encoder_states_dot_W, [2, 3])
+
+        # Equation (3)
+        if decoder_T == 1:
+            e_prime = tf.exp(e)
+        else:
+            denominator = tf.reduce_sum(tf.exp(eti_list), axis=0)
+            e_prime = tf.divide(tf.exp(e), denominator)
+        # tf.logging.info("e_prime.shape:{}".format(e_prime.get_shape())) # (batch_size, ?)
+
+        # append to eti list after e_prime been calculated
+        eti_list.append(e)
+        # tf.logging.info("e.shape:{}".format(e.get_shape())) # e.shape:(batch_size, ?)
+
+        # Equation (4)
+        attn_score = tf.divide(e_prime, tf.reduce_sum(e_prime, axis=1, keep_dims=True))
+        # tf.logging.info("attn_score.shape:{}".format(attn_score.get_shape())) # attn_score.shape:(16, ?)
+
+        return attn_score
 
 def intra_decoder_attention(decoder_states_stack):
     '''
@@ -330,7 +331,67 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
     return res + bias_term
 
 ############ The unit tests ###############
+def test_intra_temporal_attention(args):
+    batch_size = 5
+    max_total_time = 4
+    input_vector_size = 3
+    hidden_vector_size = 2
+    lstm_encode_cell = tf.nn.rnn_cell.LSTMCell(hidden_vector_size)
+    lstm_decode_cell = tf.nn.rnn_cell.LSTMCell(hidden_vector_size)
+    initial_state = lstm_decode_cell.zero_state(batch_size, tf.float32)
 
+    eti_list = []
+
+    #construct encoder_states
+    inputs = tf.random_normal(shape=(batch_size, max_total_time, input_vector_size))
+    encoder_states, state  = tf.nn.dynamic_rnn(lstm_encode_cell, inputs, dtype=tf.float32, swap_memory=True)
+    encoder_states = tf.expand_dims(encoder_states, axis=2)
+
+    decoder_states = []
+    for i in range(max_total_time):
+        if i > 0:
+            variable_scope.get_variable_scope().reuse_variables()
+        inputs = tf.random_normal(shape=(batch_size, input_vector_size))
+        output, state = lstm_decode_cell(inputs, initial_state)
+        decoder_states.append(state)
+        attn_score = intra_temporal_attention(decoder_states, encoder_states, eti_list)
+
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        _attn_score, _eti_list = sess.run([attn_score, eti_list])
+        print(_attn_score, _eti_list)
+
+''' run output
+[[0.24959728 0.250187   0.25239825 0.24781743]
+ [0.25023326 0.24915825 0.25067964 0.24992885]
+ [0.2526203  0.25018734 0.25049213 0.24670024]
+ [0.24964409 0.25249588 0.25024527 0.2476147 ]
+ [0.25222957 0.24989128 0.24894954 0.2489296 ]] [array([[ 0.00243569,  0.00110005, -0.00362626,  0.0062934 ],
+       [ 0.01002057, -0.01420728,  0.00234492, -0.00138108],
+       [-0.00786934,  0.00460867,  0.00512778,  0.02276652],
+       [-0.00048143, -0.00333946, -0.00568223, -0.00368661],
+       [-0.02969718,  0.00526314,  0.01831158,  0.03807773]],
+      dtype=float32), array([[ 4.3471083e-03,  2.1533279e-03, -5.5117412e-03,  1.0610560e-02],
+       [-1.8117115e-02,  2.3800917e-02, -2.7742297e-03,  2.0854485e-03],
+       [ 3.1152950e-03, -7.1943197e-03, -8.9176204e-03, -2.2364363e-02],
+       [-1.7991727e-03, -1.5096837e-03, -1.0802690e-02, -1.2376806e-02],
+       [-2.4162211e-02, -5.2276533e-05,  8.1756189e-03,  3.6634713e-02]],
+      dtype=float32), array([[ 3.55663244e-04,  3.51795170e-05, -1.16347615e-03,
+         1.32937881e-03],
+       [ 5.47397137e-03, -7.99820386e-03,  1.46524783e-03,
+        -8.06200551e-04],
+       [-1.19531397e-02, -6.22492004e-03, -9.17457324e-03,
+         1.69785414e-03],
+       [ 7.78692338e-05, -2.95359176e-03, -2.40339548e-03,
+         1.50260632e-04],
+       [-1.24974195e-02, -2.50677811e-03,  3.82442726e-04,
+         2.21831650e-02]], dtype=float32), array([[-0.00031409,  0.00076142,  0.00503228, -0.00376655],
+       [-0.00027401, -0.00310992,  0.00265443, -0.00072571],
+       [ 0.00479821, -0.00225311, -0.0024122 , -0.0124967 ],
+       [-0.00236128,  0.00713076, -0.00551229, -0.01508032],
+       [-0.01548023, -0.00179417,  0.00250703,  0.02576774]],
+      dtype=float32)]
+'''
 
 def test_intra_decoder_attention(args):
     #(decoder_states, decoder_states_stack):
@@ -411,8 +472,12 @@ if __name__ == "__main__":
         'test2', help='test intra decoder attention')
     command_parser.set_defaults(func=test_intra_decoder_attention)
 
+    command_parser = subparsers.add_parser(
+        'test3', help='test intra temporal attention')
+    command_parser.set_defaults(func=test_intra_temporal_attention)
+
     ARGS = parser.parse_args()
     if not hasattr(ARGS, 'func'):
         parser.print_help()
     else:
-ARGS.func(ARGS)
+        ARGS.func(ARGS)
