@@ -28,8 +28,10 @@ from tensorflow.python.ops import variable_scope
 
 # Note: this function is based attention_decoder
 # In the future, it would make more sense to write variants on the attention mechanism using the new seq2seq library for tensorflow 1.0: https://www.tensorflow.org/api_guides/python/contrib.seq2seq#Attention
-def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding_mask, cell,
-                            initial_state_attention=False, pointer_gen=True, use_coverage=False, prev_coverage=None):
+def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
+                            enc_padding_mask, cell,
+                            initial_state_attention=False, pointer_gen=True,
+                            use_coverage=False, prev_coverage=None):
     """
     Args:
       decoder_inputs: A list of 2D Tensors [batch_size x input_size].
@@ -94,25 +96,26 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
 
             return context_vector, attn_dist, decoder_context, coverage
 
+        # USING ATTENTION
         tf.logging.info("Using Intra Temporal + Decoder Attention Model")
-        # The eti in equation (1), eti is a list length of decoder_steps_length, and each eti[t] is a list of length encoder_steps_length
-        eti = []
-        # eti and ett does NOT share same weight
 
-        outputs = []
+        # The eti in equation (1), eti is a list length of decoder_steps_length, and each eti[t] is a list of length encoder_steps_length
+        eti = []  # eti and ett does NOT share same weight
+        outputs = []  # stores decoder hidden state outputs
         attn_dists = []
-        p_gens = []
-        decoder_states = []
-        temoral_attention_scores = []
-        input_contexts = []
-        decoder_contexts = []
-        state = initial_state
+        p_gens = []  # probabilities for pointer generator model of Abi
+        decoder_states = []  # hidden states from each decoder step
+        temporal_attention_scores = []
+        input_contexts = []  # encoder weighted hidden states by attention
+        decoder_contexts = []  # decoder weighted hidden states by attention
+        state = initial_state  # state to be fed into the first decoder step
         # don't need initial_state for caculation
         # decoder_states.append(state)
-        coverage = prev_coverage  # initialize coverage to None or whatever was passed in
+        coverage = prev_coverage  # initialize to None or specific value
         context_vector = array_ops.zeros([batch_size, attn_size])
         # Ensure the second shape of attention vectors is set.
         context_vector.set_shape([None, attn_size])
+
         if initial_state_attention:  # true in decode mode
             decoder_states_stack = tf.stack([[initial_state]])
             # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
@@ -121,12 +124,14 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             # in decode mode, this is what updates the coverage vector
 
         for i, inp in enumerate(decoder_inputs):
-            tf.logging.info(
-                "Adding attention_decoder timestep %i of %i", i, len(decoder_inputs))
+            tf.logging.info("Adding attention_decoder timestep %i of %i", i,
+                            len(decoder_inputs))
+
             if i > 0:
                 variable_scope.get_variable_scope().reuse_variables()
 
-            # Merge input and previous attentions into one vector x of the same size as inp
+            # Merge input and previous attentions into one vector x of the same
+            # size as inp
             input_size = inp.get_shape().with_rank(2)[1]
             if input_size.value is None:
                 raise ValueError(
@@ -157,7 +162,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
                     decoder_states, coverage)
             decoder_contexts.append(decoder_context)
             attn_dists.append(attn_dist)
-            temoral_attention_scores.append(attn_dist)
+            temporal_attention_scores.append(attn_dist)
             input_contexts.append(context_vector)
 
             # Calculate p_gen
@@ -179,7 +184,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         decoder_rets = {"outputs": outputs, "state": state,
                         "attn_dists": attn_dists, "p_gens": p_gens, "coverage": coverage}
         # extra returns for Socher model
-        decoder_rets["temoral_attention_scores"] = temoral_attention_scores
+        decoder_rets["temporal_attention_scores"] = temporal_attention_scores
         decoder_rets["input_contexts"] = input_contexts
         decoder_rets["decoder_contexts"] = decoder_contexts
 
