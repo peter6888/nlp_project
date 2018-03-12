@@ -158,6 +158,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         # Ensure the second shape of attention vectors is set.
         context_vector.set_shape([None, attn_size])
         if initial_state_attention:  # true in decode mode
+            decoder_states_stack = tf.stack([[initial_state]])
             # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
             context_vector, _, decoder_context, coverage = hybrid_attention([initial_state],
                                                                             coverage)  # in decode mode, this is what updates the coverage vector
@@ -235,7 +236,7 @@ def intra_decoder_attention(decoder_states_stack):
     decoder_T = decoder_states_stack.get_shape()[0]
     # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
     decoder_state = decoder_states_stack[-1]
-    decoder_hidden_vec_size = decoder_state.get_shape()[1].value
+    decoder_hidden_vec_size = decoder_state.get_shape().as_list()[-1]
 
     with variable_scope.variable_scope("ID_Attention"):
         # Intra-Decoder Attention
