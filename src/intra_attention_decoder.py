@@ -43,7 +43,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
       use_coverage: boolean. If True, use coverage mechanism.
       prev_coverage:
         If not None, a tensor with shape (batch_size, attn_length). The previous step's coverage vector. This is only not None in decode mode when using coverage.
-
     Returns:
       outputs: A list of the same length as decoder_inputs of 2D Tensors of
         shape [batch_size x cell.output_size]. The output vectors.
@@ -158,12 +157,10 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         # Ensure the second shape of attention vectors is set.
         context_vector.set_shape([None, attn_size])
         if initial_state_attention:  # true in decode mode
-            # Re-calculate the context vector from the previous step so that we
-            # can pass it through a linear layer with this step's input to get
-            # a modified version of the input
-            context_vector, _, decoder_context, coverage = hybrid_attention(
-                [initial_state], coverage)
-            # in decode mode, this is what updates the coverage vector
+            decoder_states_stack = tf.stack([[initial_state]])
+            # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
+            context_vector, _, decoder_context, coverage = hybrid_attention([initial_state],
+                                                                            coverage)  # in decode mode, this is what updates the coverage vector
 
         for i, inp in enumerate(decoder_inputs):
             tf.logging.info(
@@ -238,7 +235,7 @@ def intra_decoder_attention(decoder_states_stack):
     decoder_T = decoder_states_stack.get_shape()[0]
     # decoder_state[1].get_shape() (batch_size, hidden_vec_size)
     decoder_state = decoder_states_stack[-1]
-    decoder_hidden_vec_size = decoder_state.get_shape()[1].value
+    decoder_hidden_vec_size = decoder_state.get_shape().as_list()[-1]
 
     with variable_scope.variable_scope("ID_Attention"):
         # Intra-Decoder Attention
@@ -279,18 +276,15 @@ def masked_attention(e, enc_padding_mask):
 
 def linear(args, output_size, bias, bias_start=0.0, scope=None):
     """Linear map: sum_i(args[i] * W[i]), where W[i] is a variable.
-
     Args:
       args: a 2D Tensor or a list of 2D, batch x n, Tensors.
       output_size: int, second dimension of W[i].
       bias: boolean, whether to add a bias term or not.
       bias_start: starting value to initialize the bias; 0 by default.
       scope: VariableScope for the created subgraph; defaults to "Linear".
-
     Returns:
       A 2D Tensor with shape [batch x output_size] equal to
       sum_i(args[i] * W[i]), where W[i]s are newly created matrices.
-
     Raises:
       ValueError: if some of the arguments has unspecified or wrong shape.
     """
@@ -416,4 +410,4 @@ if __name__ == "__main__":
     if not hasattr(ARGS, 'func'):
         parser.print_help()
     else:
-        ARGS.func(ARGS)
+ARGS.func(ARGS)
