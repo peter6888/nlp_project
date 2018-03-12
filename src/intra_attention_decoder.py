@@ -154,9 +154,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
         # don't need initial_state for caculation
         # decoder_states.append(state)
         coverage = prev_coverage  # initialize coverage to None or whatever was passed in
-        # Stelios to keep hidden states h_t
-        dec_hidden_states = []
-
         context_vector = array_ops.zeros([batch_size, attn_size])
         # Ensure the second shape of attention vectors is set.
         context_vector.set_shape([None, attn_size])
@@ -187,20 +184,15 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             decoder_states_stack = tf.stack(decoder_states_list)
             # print(decoder_states_stack.get_shape()) #(T,batch_size, decoder_hidden_size)
 
-            # Compile cell states
-            dec_hidden_states.append(cell_output)
-
             # Run the attention mechanism.
             if i == 0 and initial_state_attention:  # always true in decode mode
                 with variable_scope.variable_scope(variable_scope.get_variable_scope(),
                                                    reuse=True):  # you need this because you've already run the initial attention(...) call
-                    # Stelios: changed to dec_hidden_states from decoder_states
                     context_vector, attn_dist, decoder_context, _ = hybrid_attention(
-                        dec_hidden_states, coverage)  # don't allow coverage to update
+                        decoder_states, coverage)  # don't allow coverage to update
             else:
-                # Stelios: changed to dec_hidden_states from decoder_states
                 context_vector, attn_dist, decoder_context, coverage = hybrid_attention(
-                    dec_hidden_states, coverage)
+                    decoder_states, coverage)
             decoder_contexts.append(decoder_context)
             attn_dists.append(attn_dist)
             temoral_attention_scores.append(attn_dist)
