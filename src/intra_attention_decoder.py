@@ -358,7 +358,7 @@ def test_intra_temporal_attention(args):
         _attn_score, _eti_list = sess.run([attn_score, eti_list])
         print(_attn_score, _eti_list)
 
-''' run output 
+''' run output
 [[0.24959728 0.250187   0.25239825 0.24781743]
  [0.25023326 0.24915825 0.25067964 0.24992885]
  [0.2526203  0.25018734 0.25049213 0.24670024]
