@@ -246,12 +246,10 @@ def intra_temporal_attention(decoder_states, encoder_states, eti_list):
         # tf.logging.info("encoder_states_dot_W.shape {}".format(encoder_states_dot_W.get_shape()))
         # encoder_states_dot_W.shape (16, len_attn, 1, 256)
 
-        decoder_state = tf.expand_dims(
-            tf.expand_dims(decoder_state, 1), 1)
+        decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1), 1)
         # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
 
-        e = math_ops.reduce_sum(
-            decoder_state * encoder_states_dot_W, [2, 3])
+        e = math_ops.reduce_sum(decoder_state * encoder_states_dot_W, [2, 3])
         # shape: (batch_size x attn_length)
 
         # Equation (3)
@@ -279,10 +277,10 @@ def intra_decoder_attention(decoder_states_stack):
     https://arxiv.org/abs/1705.04304.
     Args:
         decoder_states_stack: tensor of decoder hidden states
-            size: [T, batch_size, decoder_hidden_size]
+            size = [T, batch_size, decoder_hidden_size]
     Returns:
         attn_score: tensor of attnetion scores alpha_d_tt (Equation 7),
-            size: [batch_size, T - 1]
+            size = [batch_size, T - 1]
     '''
     batch_size = decoder_states_stack[-1].get_shape()[0].value
     decoder_T = decoder_states_stack.get_shape()[0]
