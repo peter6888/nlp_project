@@ -127,7 +127,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
             # Equation (8) - result has shape (batch_size, decoder_hidden_size)
             if len(decoder_states) > 1:
                 decoder_context = tf.einsum('ijk,ji->jk', decoder_states_stack[:-1, :, :],
-                                            decoder_attention[:, :-1])  # ignore the last e
+                                            decoder_attention)  # ignore the last e
             else:
                 decoder_context = tf.zeros(shape=[decoder_attention.get_shape().as_list()[
                                            0], decoder_states[-1][1].get_shape().as_list()[1]])
@@ -245,17 +245,14 @@ def intra_decoder_attention(decoder_states_stack):
         if decoder_T > 1:
             # Equation (6)
             # tf.einsum implementation
-            # return shape [T, batch_size, hidden_state_size]
-            decoder_states_dot_W = tf.einsum(
-                "ij,tbi->tbj", W_d_attn, decoder_states_stack)
-            # return shape [batch_size, T]
+            # return shape [T-1, batch_size, hidden_state_size]
+            decoder_states_dot_W = tf.einsum("ij,tbi->tbj", W_d_attn, decoder_states_stack[:-1])
+            # return shape [batch_size, T-1]
             e = tf.einsum("tbi,bi->bt", decoder_states_dot_W, decoder_state)
 
             # Equation (7)
-            denominator = tf.reduce_sum(
-                tf.exp(e[:, :-1]), axis=1, keep_dims=True)  # ignore the last e
-            # shape (batch_size, decoder_T)
-            attn_score = tf.divide(tf.exp(e), denominator)
+            # shape (batch_size, decoder_T-1)
+            attn_score = tf.nn.softmax(e)
         else:
             attn_score = tf.zeros([batch_size, 1])
 
@@ -365,6 +362,12 @@ def test_intra_decoder_attention(args):
  [0.33333334 0.33333334 0.33333334 0.33333334]
  [0.3333333  0.3333333  0.3333333  0.3333333 ]
  [0.33333334 0.33333334 0.33333334 0.33333334]]
+--new run result--
+[[0.33333334 0.33333334 0.33333334]
+ [0.33333334 0.33333334 0.33333334]
+ [0.33333334 0.33333334 0.33333334]
+ [0.33333334 0.33333334 0.33333334]
+ [0.33333334 0.33333334 0.33333334]]
 '''
 
 
