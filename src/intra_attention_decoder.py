@@ -43,7 +43,6 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states, enc_p
       use_coverage: boolean. If True, use coverage mechanism.
       prev_coverage:
         If not None, a tensor with shape (batch_size, attn_length). The previous step's coverage vector. This is only not None in decode mode when using coverage.
-
     Returns:
       outputs: A list of the same length as decoder_inputs of 2D Tensors of
         shape [batch_size x cell.output_size]. The output vectors.
@@ -276,18 +275,15 @@ def masked_attention(e, enc_padding_mask):
 
 def linear(args, output_size, bias, bias_start=0.0, scope=None):
     """Linear map: sum_i(args[i] * W[i]), where W[i] is a variable.
-
     Args:
       args: a 2D Tensor or a list of 2D, batch x n, Tensors.
       output_size: int, second dimension of W[i].
       bias: boolean, whether to add a bias term or not.
       bias_start: starting value to initialize the bias; 0 by default.
       scope: VariableScope for the created subgraph; defaults to "Linear".
-
     Returns:
       A 2D Tensor with shape [batch x output_size] equal to
       sum_i(args[i] * W[i]), where W[i]s are newly created matrices.
-
     Raises:
       ValueError: if some of the arguments has unspecified or wrong shape.
     """
@@ -477,4 +473,4 @@ if __name__ == "__main__":
     if not hasattr(ARGS, 'func'):
         parser.print_help()
     else:
-        ARGS.func(ARGS)
+ARGS.func(ARGS)
