@@ -158,9 +158,9 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
                 print("initial_state[1].shape {}".format(initial_state[1].get_shape()))
                 intra_context_vector = tf.zeros(shape=[batch_size, initial_state[1].get_shape().as_list()[1]])
                 print("inp.shape {}, context_vector.shape {}, intra_context_vector.shape {}".format(inp.get_shape().as_list(), context_vector.get_shape().as_list(), intra_context_vector.get_shape()))
-                x = linear([inp] + [context_vector] + [context_vector] + [intra_context_vector], input_size, True)
+                x = linear([inp] + [context_vector] + [intra_context_vector], input_size, True)
             else:
-                x = linear([inp] + [context_vector] + [context_vector] + [decoder_context], input_size, True)
+                x = linear([inp] + [context_vector] + [decoder_context], input_size, True)
             print("x shape:{}".format(x.get_shape().as_list()))
 
             # Run the decoder RNN cell. cell_output = decoder state
