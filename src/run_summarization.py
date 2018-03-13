@@ -69,7 +69,7 @@ tf.app.flags.DEFINE_float('max_grad_norm', 2.0, 'for gradient clipping')
 tf.app.flags.DEFINE_boolean('pointer_gen', False, 'If True, use pointer-generator model. If False, use baseline model.')
 
 # The Deep Reinforced Model
-tf.app.flags.DEFINE_integer('attention_model', 0, '0-Pointer-generator, 1-Intra-Temporal Attention.')
+tf.app.flags.DEFINE_integer('attention_model', 1, '0-Pointer-generator, 1-Intra-Temporal Attention.')
 
 # The input attention caculation
 tf.app.flags.DEFINE_integer('input_attention', 0, '0-Pointer-generator-attention, 1-Intra-Temporal Attention.')

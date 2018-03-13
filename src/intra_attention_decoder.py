@@ -133,7 +133,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
         context_vector.set_shape([None, attn_size])
 
         if initial_state_attention:  # true in decode mode
-            decoder_states_stack = tf.stack([[initial_state]])
+            decoder_states_stack = tf.zeros(shape=[1, batch_size, initial_state[1].get_shape().as_list()[1]])
             # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
             context_vector, _, decoder_context, coverage = hybrid_attention(
                 [initial_state], coverage)
@@ -154,7 +154,13 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
                 raise ValueError(
                     "Could not infer input size from input: %s" % inp.name)
             print("inp shape:{}".format(inp.get_shape().as_list()))
-            x = inp #linear([inp] + [context_vector], input_size, True)
+            if i==0:
+                print("initial_state[1].shape {}".format(initial_state[1].get_shape()))
+                intra_context_vector = tf.zeros(shape=[batch_size, initial_state[1].get_shape().as_list()[1]])
+                print("inp.shape {}, context_vector.shape {}, intra_context_vector.shape {}".format(inp.get_shape().as_list(), context_vector.get_shape().as_list(), intra_context_vector.get_shape()))
+                x = linear([inp] + [context_vector] + [context_vector] + [intra_context_vector], input_size, True)
+            else:
+                x = linear([inp] + [context_vector] + [context_vector] + [decoder_context], input_size, True)
             print("x shape:{}".format(x.get_shape().as_list()))
 
             # Run the decoder RNN cell. cell_output = decoder state
