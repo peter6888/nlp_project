@@ -155,7 +155,8 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
             # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
             context_vector, _, coverage = attention(initial_state,
                                                     coverage)  # in decode mode, this is what updates the coverage vector
-            intra_context_vector = intra_decoder_context(tf.zeros(shape=[1, batch_size, initial_state[1].get_shape().as_list()[1]]))
+            if use_intra_decoder_attention:
+                intra_context_vector = intra_decoder_context(tf.zeros(shape=[1, batch_size, initial_state[1].get_shape().as_list()[1]]))
         for i, inp in enumerate(decoder_inputs):
             tf.logging.info("Adding attention_decoder timestep %i of %i", i, len(decoder_inputs))
             if i > 0:
