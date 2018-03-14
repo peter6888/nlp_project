@@ -14,6 +14,7 @@
 # ==============================================================================
 import argparse
 import tensorflow as tf
+import numpy as np
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import variable_scope
@@ -307,12 +308,43 @@ def test_intra_decoder_attention(args):
     :param args:
     :return:
     '''
-    attn = intra_decoder_attention(get_decoder_states_stack())
+
+    dec_stack = get_decoder_states_stack()
+    attn = intra_decoder_attention(dec_stack)
+
+    with variable_scope.variable_scope("ID_Attention"):
+        variable_scope.get_variable_scope().reuse_variables()
+        # Read W_d_attn
+        W_d_attn = tf.get_variable('W_d_attn')
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        _attn = sess.run(attn)
+        _attn, _stack, _W = sess.run([attn, dec_stack, W_d_attn])
         print(_attn)
+        print("stack values")
+        print(_stack)
+        print("W values:")
+        print(_W)
+
+        h_T = _stack[-1] # shape (batch_size, vector_size)
+
+        #Equation (6)
+        w_dot_h_T = np.einsum("bi, ij->bj", h_T, _W)
+        print("w_dot_h_T")
+        print(w_dot_h_T)
+        e_d_t_t_prime = np.einsum("bi,tbi->bt", w_dot_h_T, _stack[:-1])
+        print("Equation (6) result:")
+        print(e_d_t_t_prime)
+
+        #Equation (7)
+        exp_e_s = np.exp(e_d_t_t_prime)
+        print("After np.exp()")
+        print(exp_e_s)
+        print("sum over time:")
+        print(np.sum(exp_e_s, axis=1, keepdims=True))
+        print("After divide and sum over")
+        result = exp_e_s / np.sum(exp_e_s, axis=1, keepdims=True)
+        print(result)
 
 '''
 --first run result---
