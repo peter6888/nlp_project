@@ -22,8 +22,8 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import variable_scope
-from attention_common import linear, masked_attention
-from attention_common import intra_decoder_context, intra_temporal_attention
+from attention_common import linear
+from attention_common import intra_decoder_context, intra_temporal_context
 
 # Note: this function is based attention_decoder
 # In the future, it would make more sense to write variants on the attention mechanism using the new seq2seq library for tensorflow 1.0: https://www.tensorflow.org/api_guides/python/contrib.seq2seq#Attention
@@ -81,24 +81,7 @@ def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
                     size = [batch_size x hidden_dims]
                 coverage: as per Abi's code to prevent repetition
             '''
-
-            temporal_attention = intra_temporal_attention(decoder_states,
-                                                          encoder_states, eti)
-
-
-            # Calculate encoder distribution
-            # Mask padded sequences
-            attn_dist = masked_attention(temporal_attention, enc_padding_mask)
-
-            # Equation (5)
-            # encoder_states: batch_size x attn_length x 1 x attn_size
-            # attn_dist: batch_size x attn_length
-            # Result has shape (batch_size, 1, encoder_hidden_size)
-            # --> After squeeze (batch_size, encoder_hidden_size)
-            temporal_context = tf.squeeze(
-                tf.einsum('btkh,bt->bkh', encoder_states, attn_dist))
-            # print(temporal_context.get_shape())--> (16, 512)
-            context_vector = temporal_context
+            context_vector, attn_dist = intra_temporal_context(decoder_states, encoder_states, eti, enc_padding_mask)
 
             # Equation (8)
             # decoder_states_stack: T x batch_size x decoder_hidden_size
