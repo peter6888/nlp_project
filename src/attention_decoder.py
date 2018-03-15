@@ -149,9 +149,9 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
             # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
             context_vector, _, coverage = attention(initial_state,
                                                     coverage)  # in decode mode, this is what updates the coverage vector
-            if use_intra_decoder_attention==1:
-                intra_context_vector = intra_decoder_context(tf.zeros(shape=[1, batch_size, initial_state[1].get_shape().as_list()[1]]))
-            elif use_intra_decoder_attention==2 or use_intra_decoder_attention==3:
+            #if use_intra_decoder_attention==1:
+            intra_context_vector = intra_decoder_context(tf.zeros(shape=[1, batch_size, initial_state[1].get_shape().as_list()[1]]))
+            if use_intra_decoder_attention==2 or use_intra_decoder_attention==3:
                 print("Intra model -")
                 context_vector, _ = intra_temporal_context([initial_state], encoder_states, [], enc_padding_mask)
         for i, inp in enumerate(decoder_inputs):
@@ -164,7 +164,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
             if input_size.value is None:
                 raise ValueError("Could not infer input size from input: %s" % inp.name)
 
-            if use_intra_decoder_attention==1 or use_intra_decoder_attention==2:
+            if use_intra_decoder_attention==1 or use_intra_decoder_attention==2 or use_intra_decoder_attention==3:
                 if i==0:
                     print("initial_state[1].shape {}".format(initial_state[1].get_shape()))
                     intra_context_vector = tf.zeros(shape=[batch_size, initial_state[1].get_shape().as_list()[1]])
