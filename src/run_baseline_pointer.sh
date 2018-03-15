@@ -1,0 +1,1 @@
+python run_summarization.py --mode=train --data_path=../data/finished_files/chunked/train_*.bin --vocab_path=../data/finished_files/vocab --log_root=log --input_attention=0 --attention_model=0 --pointer_gen=True --use_intra_decoder_attention=False --exp_name=Abisee_pointer_gen_Mar13

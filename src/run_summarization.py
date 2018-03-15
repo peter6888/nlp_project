@@ -51,9 +51,9 @@ tf.app.flags.DEFINE_string('exp_name', '',
 # Hyperparameters
 tf.app.flags.DEFINE_integer('hidden_dim', 128, 'dimension of RNN hidden states')
 tf.app.flags.DEFINE_integer('emb_dim', 128, 'dimension of word embeddings')
-tf.app.flags.DEFINE_integer('batch_size', 4, 'minibatch size')
-tf.app.flags.DEFINE_integer('max_enc_steps', 200, 'max timesteps of encoder (max source text tokens)')
-tf.app.flags.DEFINE_integer('max_dec_steps', 50, 'max timesteps of decoder (max summary tokens)')
+tf.app.flags.DEFINE_integer('batch_size', 32, 'minibatch size')
+tf.app.flags.DEFINE_integer('max_enc_steps', 400, 'max timesteps of encoder (max source text tokens)')
+tf.app.flags.DEFINE_integer('max_dec_steps', 100, 'max timesteps of decoder (max summary tokens)')
 tf.app.flags.DEFINE_integer('beam_size', 4, 'beam size for beam search decoding.')
 tf.app.flags.DEFINE_integer('min_dec_steps', 35,
                             'Minimum sequence length of generated summary. Applies only for beam search decoding mode')
@@ -66,16 +66,16 @@ tf.app.flags.DEFINE_float('trunc_norm_init_std', 1e-4, 'std of trunc norm init, 
 tf.app.flags.DEFINE_float('max_grad_norm', 2.0, 'for gradient clipping')
 
 # Pointer-generator or baseline model
-tf.app.flags.DEFINE_boolean('pointer_gen', False, 'If True, use pointer-generator model. If False, use baseline model.')
+tf.app.flags.DEFINE_boolean('pointer_gen', True, 'If True, use pointer-generator model. If False, use baseline model.')
 
 # The Deep Reinforced Model
-tf.app.flags.DEFINE_integer('attention_model', 1, '0-Pointer-generator, 1-Intra-Temporal Attention.')
+tf.app.flags.DEFINE_integer('attention_model', 0, '0-Pointer-generator, 1-Intra-Temporal Attention.')
 
 # The input attention caculation
 tf.app.flags.DEFINE_integer('input_attention', 0, '0-Pointer-generator-attention, 1-Intra-Temporal Attention.')
 
 # The input attention caculation
-tf.app.flags.DEFINE_integer('use_intra_decoder_attention', True, 'if False, Pointer-generator-attention only, if True, concat with Intra-Decoder Attention.')
+tf.app.flags.DEFINE_boolean('use_intra_decoder_attention', True, 'if False, Pointer-generator-attention only, if True, concat with Intra-Decoder Attention.')
 
 # Coverage hyperparameters
 tf.app.flags.DEFINE_boolean('coverage', False,
