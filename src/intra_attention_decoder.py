@@ -30,7 +30,8 @@ from attention_common import intra_decoder_context, intra_temporal_context
 def intra_attention_decoder(decoder_inputs, initial_state, encoder_states,
                             enc_padding_mask, cell,
                             initial_state_attention=False, pointer_gen=True,
-                            use_coverage=False, prev_coverage=None, input_attention=1, use_intra_decoder_attention=0):
+                            use_coverage=False, prev_coverage=None,
+                            input_attention=1, use_intra_decoder_attention=0):
     """
     Args:
       decoder_inputs: A list of 2D Tensors [batch_size x input_size].
