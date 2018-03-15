@@ -21,13 +21,13 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import variable_scope
-from attention_common import intra_decoder_context
+from attention_common import intra_decoder_context, intra_temporal_context
 
 
 # Note: this function is based on tf.contrib.legacy_seq2seq_attention_decoder, which is now outdated.
 # In the future, it would make more sense to write variants on the attention mechanism using the new seq2seq library for tensorflow 1.0: https://www.tensorflow.org/api_guides/python/contrib.seq2seq#Attention
 def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding_mask, cell,
-                      initial_state_attention=False, pointer_gen=True, use_coverage=False, prev_coverage=None, input_attention=1, use_intra_decoder_attention=False):
+                      initial_state_attention=False, pointer_gen=True, use_coverage=False, prev_coverage=None, input_attention=1, use_intra_decoder_attention=0):
     """
     Args:
       decoder_inputs: A list of 2D Tensors [batch_size x input_size].
@@ -147,6 +147,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
         state = initial_state
 
         decoder_states = []  # hidden states from each decoder step
+        eti = []
 
         coverage = prev_coverage  # initialize coverage to None or whatever was passed in
         context_vector = array_ops.zeros([batch_size, attn_size])
@@ -155,8 +156,11 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
             # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
             context_vector, _, coverage = attention(initial_state,
                                                     coverage)  # in decode mode, this is what updates the coverage vector
-            if use_intra_decoder_attention:
+            if use_intra_decoder_attention==1:
                 intra_context_vector = intra_decoder_context(tf.zeros(shape=[1, batch_size, initial_state[1].get_shape().as_list()[1]]))
+            elif use_intra_decoder_attention==2:
+                print("Intra model -")
+                context_vector, _ = intra_temporal_context([initial_state], encoder_states, [], enc_padding_mask)
         for i, inp in enumerate(decoder_inputs):
             tf.logging.info("Adding attention_decoder timestep %i of %i", i, len(decoder_inputs))
             if i > 0:
@@ -167,7 +171,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
             if input_size.value is None:
                 raise ValueError("Could not infer input size from input: %s" % inp.name)
 
-            if use_intra_decoder_attention:
+            if use_intra_decoder_attention==1 or use_intra_decoder_attention==2:
                 if i==0:
                     print("initial_state[1].shape {}".format(initial_state[1].get_shape()))
                     intra_context_vector = tf.zeros(shape=[batch_size, initial_state[1].get_shape().as_list()[1]])
@@ -189,12 +193,17 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
                 with variable_scope.variable_scope(variable_scope.get_variable_scope(),
                                                    reuse=True):  # you need this because you've already run the initial attention(...) call
                     context_vector, attn_dist, _ = attention(state, coverage)  # don't allow coverage to update
-                    if use_intra_decoder_attention:
+                    if use_intra_decoder_attention==1:
                         intra_context_vector = intra_decoder_context(decoder_states_stack)
+                    elif use_intra_decoder_attention==2:
+                        context_vector, attn_dist, = intra_temporal_context(decoder_states, encoder_states, eti, enc_padding_mask)
             else:
                 context_vector, attn_dist, coverage = attention(state, coverage)
-                if use_intra_decoder_attention:
+                if use_intra_decoder_attention==1:
                     intra_context_vector = intra_decoder_context(decoder_states_stack)
+                elif use_intra_decoder_attention==2:
+                    print("intra_model--")
+                    context_vector, attn_dist = intra_temporal_context(decoder_states, encoder_states, eti, enc_padding_mask)
             attn_dists.append(attn_dist)
 
             # Calculate p_gen
