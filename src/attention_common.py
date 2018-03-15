@@ -19,6 +19,34 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import variable_scope
 
+def intra_temporal_context(decoder_states, encoder_states, eti, enc_padding_mask):
+    '''
+    Caculate the intra_temporal context
+    :param decoder_states:
+    :param encoder_states:
+    :param eti:
+    :param enc_padding_mask:
+    :return:
+    '''
+    # Calculate encoder distribution
+    # Mask padded sequences
+    temporal_attention = intra_temporal_attention(decoder_states,
+                                                      encoder_states, eti)
+    attn_dist = masked_attention(temporal_attention, enc_padding_mask)
+
+    # Equation (5)
+    # encoder_states: batch_size x attn_length x 1 x attn_size
+    # attn_dist: batch_size x attn_length
+    # Result has shape (batch_size, 1, encoder_hidden_size)
+    # --> After squeeze (batch_size, encoder_hidden_size)
+    temporal_context = tf.squeeze(
+        tf.einsum('btkh,bt->bkh', encoder_states, attn_dist))
+    # print(temporal_context.get_shape())--> (16, 512)
+    context_vector = temporal_context
+
+    return context_vector, attn_dist
+
+
 def intra_temporal_attention(decoder_states, encoder_states, eti_list):
     '''
     Get Intra-Temporal Attention Score. Refs to original paper section 2.1 https://arxiv.org/abs/1705.04304
