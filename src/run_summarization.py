@@ -75,7 +75,7 @@ tf.app.flags.DEFINE_integer('attention_model', 0, '0-Pointer-generator, 1-Intra-
 tf.app.flags.DEFINE_integer('input_attention', 0, '0-Pointer-generator-attention, 1-Intra-Temporal Attention.')
 
 # The input attention caculation
-tf.app.flags.DEFINE_integer('use_intra_decoder_attention', 0, 'if 0, Pointer-generator-attention only, if 1, concat with Intra-Decoder Attention, if 2, Intra Attention (Intra Temporal + Intra Decoder)')
+tf.app.flags.DEFINE_integer('use_intra_decoder_attention', 3, 'if 0, Pointer-generator-attention only, \if 1, concat with Intra-Decoder Attention, if 2, Intra Attention (Intra Temporal + Intra Decoder), if 3, Intra Temoral only')
 
 # Coverage hyperparameters
 tf.app.flags.DEFINE_boolean('coverage', False,
