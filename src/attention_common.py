@@ -50,9 +50,12 @@ def intra_temporal_context(decoder_states, encoder_states, eti, enc_padding_mask
 def intra_temporal_attention(decoder_states, encoder_states, eti_list):
     '''
     Get Intra-Temporal Attention Score. Refs to original paper section 2.1 https://arxiv.org/abs/1705.04304
-    :param decoder_state:
-    :param coverage: None
-    :return:attention score
+    :param decoder_states: list of Tuple (c, h) from output of a LSTM cell,
+                          each h has shape [batch_size, hidden_vector_size]
+    :param encoder_states: expanded outputs from RNN, has shape [batch_size, T, 1, hidden_vector_size]
+    :param eti_list: attention score list, shape [decoder_t, batch_size, encoder_T]
+                          and the new attention score will also appended to the end
+    :return:temporal attention score: shape [decoder_t, attention_vector_size]
     '''
     # Extract hidden state from list and tuple of decoder states
     decoder_state = decoder_states[-1][1]
@@ -64,28 +67,37 @@ def intra_temporal_attention(decoder_states, encoder_states, eti_list):
     # Intra-Temporal Attention
     with variable_scope.variable_scope("IT_Attention"):
 
+        # As matter of fact the Encoder is bidirectional LSTM, it has 2 * hidden_vector_size,
+        # Need to use a linear layer to scale down to half size to align with Decoder's size
+        # Use a transform matrix to do this.
+        # transform matrix shape [encoder_hidden_vec_size, decoder_hidden_vec_size]
+        eyes = 0.5 * tf.concat([tf.eye(decoder_hidden_vec_size), tf.eye(decoder_hidden_vec_size)], axis=0)
+        trans_encoder_states = tf.einsum("btkh,hj->btj", encoder_states, eyes) #shape [batch_size, encoder_seq_length, decoder_hidden_vec_size]
+
         # Equation (2) W_e_attn for h_d (hidden decoder vectors) and
         # h_e (hidden encoder vectors)
         W_e_attn = tf.get_variable('W_e_attn',
-                                   shape=(1, 1,
-                                          encoder_hidden_vec_size,
+                                   shape=(#1, 1,
+                                          decoder_hidden_vec_size,
                                           decoder_hidden_vec_size),
                 initializer=tf.contrib.layers.xavier_initializer())
 
         decoder_T = len(decoder_states)
 
-        encoder_states_dot_W = nn_ops.conv2d(encoder_states, W_e_attn,
-                                            [1, 1, 1, 1],
-                                            "SAME")
-        # shape (batch_size,?,1,decoder_hidden_vec_size)
+        #encoder_states_dot_W = nn_ops.conv2d(trans_encoder_states, W_e_attn,
+        #                                    [1, 1, 1, 1],
+        #                                    "SAME")
+        encoder_states_dot_W = tf.einsum("bli,ij->blj", trans_encoder_states, W_e_attn)
+        # shape (batch_size,?,1,decoder_hidden_vec_size) # shape (batch_size,encoder_seq_length, decoder_hidden_vec_size)
 
         # tf.logging.info("encoder_states_dot_W.shape {}".format(encoder_states_dot_W.get_shape()))
         # encoder_states_dot_W.shape (16, len_attn, 1, 256)
 
-        decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1), 1)
+        #decoder_state = tf.expand_dims(tf.expand_dims(decoder_state, 1), 1)
         # reshape to (batch_size, 1, 1, decoder_hidden_vec_size)
 
-        e = math_ops.reduce_sum(decoder_state * encoder_states_dot_W, [2, 3])
+        #e = math_ops.reduce_sum(decoder_state * encoder_states_dot_W, [2, 3])
+        e = tf.einsum("bi,bti->bt", decoder_state, encoder_states_dot_W)
         # shape: (batch_size x attn_length)
 
         # Equation (3)
@@ -102,7 +114,7 @@ def intra_temporal_attention(decoder_states, encoder_states, eti_list):
         # e.shape:(batch_size, ?)
 
         # Equation (4)
-        attn_score = tf.nn.softmax(e_prime)
+        attn_score = tf.divide(e_prime, tf.reduce_sum(e_prime, axis=1, keep_dims=True)) #tf.nn.softmax(e_prime)
         # tf.logging.info("attn_score.shape:{}".format(attn_score.get_shape())) # attn_score.shape:(16, attn_length)
 
         return attn_score
@@ -260,9 +272,10 @@ def test_intra_temporal_attention(args):
     batch_size = 5
     max_total_time = 4
     input_vector_size = 3
-    hidden_vector_size = 2
-    lstm_encode_cell = tf.nn.rnn_cell.LSTMCell(hidden_vector_size)
-    lstm_decode_cell = tf.nn.rnn_cell.LSTMCell(hidden_vector_size)
+    encoder_vector_size = 4
+    decoder_vector_size = 2
+    lstm_encode_cell = tf.nn.rnn_cell.LSTMCell(encoder_vector_size)
+    lstm_decode_cell = tf.nn.rnn_cell.LSTMCell(decoder_vector_size)
     initial_state = lstm_decode_cell.zero_state(batch_size, tf.float32)
 
     eti_list = []
@@ -281,10 +294,90 @@ def test_intra_temporal_attention(args):
         decoder_states.append(state)
         attn_score = intra_temporal_attention(decoder_states, encoder_states, eti_list)
 
+    with variable_scope.variable_scope("IT_Attention"):
+        variable_scope.get_variable_scope().reuse_variables()
+        W_d_attn = tf.get_variable('W_e_attn')
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        _attn_score, _eti_list = sess.run([attn_score, eti_list])
-        print(_attn_score, _eti_list)
+        _attn_score, _eti_list, _W, _states, _decoder_states = sess.run([attn_score, eti_list, W_d_attn, encoder_states, decoder_states])
+        print("[attn_score]")#, eti_list[-1]") #, W_d_attn, encoder_states]")
+        print(_attn_score)
+        print("the last eti from eti_list[-1]")
+        print(_eti_list[-1])
+
+        # To verify the equation (3) and (4) calculation
+        _eti = np.exp(_eti_list[-1]) #shape [batch_size, encoder_sequence_length]
+        _eti_list = _eti_list[:-1] # remove last one
+        # t > 1 in our test case
+        exp_eti = np.exp(_eti_list) # shape [T-1, batch_size, encoder_sequence_length]
+        denominator = np.sum(exp_eti, axis=0) # shape [batch_size, encoder_sequence_length]
+        temporal_score = _eti / denominator # eti_prime at current time T shape [batch_size, encoder_sequence_length]
+        attn = temporal_score / np.sum(temporal_score, axis=1, keepdims=True)
+        print("Equation (4) output:")
+        print(attn)
+        print("with softmax:")
+        print(np.exp(temporal_score) / np.sum(np.exp(temporal_score), axis=1, keepdims=True))
+        print("Function output:")
+        print(_attn_score)
+
+        # print("decoder_states")
+        # print(_decoder_states)
+        _states = np.squeeze(_states) # new shape [batch_size, max_total_time, hidden_vector_size]
+        #_W = np.squeeze(_W) # new shape [hidden_vector_size, hidden_vector_size]
+        #_eti_list = _eti_list[:-1] # The last one was appended
+        _state = _decoder_states[-1][1] # shape [batch_size, hidden_vector_size]
+        print("Current decoder state and shape")
+        print(_state, _state.shape)
+        print("Caculate from left to right of the equation.")
+        h_dt_dot_W = np.einsum("bi,ij->bj", _state, _W) # shape [batch_size, hidden_vector_size]
+        print("h_dt_dot_W.shape")
+        print(h_dt_dot_W.shape)
+        print("_states.shape:")
+        print(_states.shape)
+        # transform to half of the shape
+        _eyes = 0.5 * np.concatenate([np.eye(decoder_vector_size), np.eye(decoder_vector_size)], axis=0)
+        _states = np.einsum("bth,hj->btj", _states, _eyes)
+        print("_states new shape:{}".format(_states.shape))
+        e_ti = np.einsum("bi,bTi->bT", h_dt_dot_W, _states) # shape [batch_size,max_total_time]
+        print("e_ti shape {}".format(e_ti.shape))
+        print(e_ti)
+        print("Caculate from right to left of the equation.")
+        W_dot_h_et = np.einsum("ij,bTj->bTi", _W, _states) #output shape [batch_size, max_total_time, hidden_vector_size]
+        print("W dot h_et shape")
+        print(W_dot_h_et.shape)
+        e_ti_right = np.einsum("bi,bTi->bT", _state, W_dot_h_et)
+        print("e_ti from right")
+        print(e_ti_right)
+        # To-do: need t==1 test case
+        e_ti_prime = np.exp(e_ti)
+        print("eti list shape:{} x {}".format(len(_eti_list), _eti_list[0].shape))
+        denominator = np.sum(np.exp(_eti_list), axis=0) # shape [batch_size, max_total_time]
+        print(np.exp(_eti_list))
+        print(denominator.shape)
+        temporal_score = e_ti_prime / denominator
+        print("temporal_score (equation 3)")
+        print(temporal_score) # shape [batch_size, max_total_time]
+        print("temporal attention")
+        _att = temporal_score / np.sum(temporal_score, axis=1, keepdims=True)
+        print("Attention shape")
+        print(_att.shape)
+        print("Attention--")
+        print(_att)
+        print("If do softmax")
+        print(np.exp(temporal_score) / np.sum(np.exp(temporal_score), axis=0))
+        #e_ti_prime = np.zeros(shape=[batch_size, max_total_time])
+        #e_ti_prime[:,0] = np.exp(e_ti)
+
+'''
+    shapes --
+    _states:        [batch_size, max_total_time, 1, hidden_vector_size]
+    _decoder_states: list length decoder_t, the second value in the Tuple has shape [batch_size, hidden_vector_size]
+    _W:             [hidden_vector_size, hidden_vector_size]
+    _eti_list:       list length decoder_t, element [batch_size, max_total_time]
+'''
+
+
+
 
 ''' run output
 [[0.24959728 0.250187   0.25239825 0.24781743]
