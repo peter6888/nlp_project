@@ -171,6 +171,13 @@ def intra_decoder_context(decoder_states_stack):
 
     return decoder_context
 
+def masked_attention_with_softmax(e, masks):
+    """Take softmax of e then apply enc_padding_mask and re-normalize"""
+    attn_dist = nn_ops.softmax(e)  # take softmax. shape (batch_size, attn_length)
+    attn_dist *= masks  # apply mask
+    masked_sums = tf.reduce_sum(attn_dist, axis=1)  # shape (batch_size)
+    return attn_dist / tf.reshape(masked_sums, [-1, 1])  # re-normalize
+
 def masked_attention(e, enc_padding_mask):
     '''
     Apply enc_padding_mask on encoder attention, and re-normalized it
