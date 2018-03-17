@@ -147,13 +147,11 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
         context_vector.set_shape([None, attn_size])  # Ensure the second shape of attention vectors is set.
         if initial_state_attention:  # true in decode mode
             # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
-            context_vector, _, coverage = attention(initial_state,
-                                                    coverage)  # in decode mode, this is what updates the coverage vector
-            #if use_intra_decoder_attention==1:
-            intra_context_vector = intra_decoder_context(tf.zeros(shape=[1, batch_size, initial_state[1].get_shape().as_list()[1]]))
-            if use_intra_decoder_attention==2 or use_intra_decoder_attention==3:
-                print("Intra model -")
-                context_vector, _ = intra_temporal_context([initial_state], encoder_states, [], enc_padding_mask)
+            attn_dist, context_vector, intra_context_vector = get_context(use_intra_decoder_attention,
+                                                                              attention, coverage,
+                                                                              [initial_state], tf.zeros(shape=[1, batch_size, initial_state[1].get_shape().as_list()[1]]),
+                                                                              enc_padding_mask, encoder_states, [],
+                                                                              initial_state)
         for i, inp in enumerate(decoder_inputs):
             tf.logging.info("Adding attention_decoder timestep %i of %i", i, len(decoder_inputs))
             if i > 0:
@@ -164,13 +162,13 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
             if input_size.value is None:
                 raise ValueError("Could not infer input size from input: %s" % inp.name)
 
-            if use_intra_decoder_attention==1 or use_intra_decoder_attention==2 or use_intra_decoder_attention==3:
+            if use_intra_decoder_attention==1 or use_intra_decoder_attention==2:
                 if i==0:
                     print("initial_state[1].shape {}".format(initial_state[1].get_shape()))
                     intra_context_vector = tf.zeros(shape=[batch_size, initial_state[1].get_shape().as_list()[1]])
                 print("inp.shape {}, context_vector.shape {}, intra_context_vector.shape {}".format(inp.get_shape().as_list(), context_vector.get_shape().as_list(), intra_context_vector.get_shape()))
                 x = linear([inp] + [context_vector] + [intra_context_vector], input_size, True)
-            else: # 3 or 0
+            else: # 0 or 3
                 x = linear([inp] + [context_vector], input_size, True)
 
             # Run the decoder RNN cell. cell_output = decoder state
@@ -185,18 +183,17 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
             if i == 0 and initial_state_attention:  # always true in decode mode
                 with variable_scope.variable_scope(variable_scope.get_variable_scope(),
                                                    reuse=True):  # you need this because you've already run the initial attention(...) call
-                    context_vector, attn_dist, _ = attention(state, coverage)  # don't allow coverage to update
-                    if use_intra_decoder_attention != 0:
-                        intra_context_vector = intra_decoder_context(decoder_states_stack)
-                    if use_intra_decoder_attention==2 or use_intra_decoder_attention == 3: #overwrite default context_vector
-                        context_vector, attn_dist, = intra_temporal_context(decoder_states, encoder_states, eti, enc_padding_mask)
+                    attn_dist, context_vector, intra_context_vector = get_context(use_intra_decoder_attention,
+                                                                                  attention, coverage,
+                                                                                  decoder_states, decoder_states_stack,
+                                                                                  enc_padding_mask, encoder_states, eti,
+                                                                                  state)
             else:
-                context_vector, attn_dist, coverage = attention(state, coverage)
-                if use_intra_decoder_attention != 0:
-                    intra_context_vector = intra_decoder_context(decoder_states_stack)
-                if use_intra_decoder_attention == 2 or use_intra_decoder_attention == 3: #overwrite default context_vector
-                    print("intra_model--")
-                    context_vector, attn_dist = intra_temporal_context(decoder_states, encoder_states, eti, enc_padding_mask)
+                attn_dist, context_vector, intra_context_vector = get_context(use_intra_decoder_attention,
+                                                                              attention, coverage,
+                                                                              decoder_states, decoder_states_stack,
+                                                                              enc_padding_mask, encoder_states, eti,
+                                                                              state)
             attn_dists.append(attn_dist)
 
             # Calculate p_gen
@@ -220,6 +217,40 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
             coverage = array_ops.reshape(coverage, [batch_size, -1])
 
         return {"outputs":outputs, "state":state, "attn_dists":attn_dists, "p_gens":p_gens, "coverage":coverage}
+
+
+def get_context(use_intra_decoder_attention, attention, coverage, decoder_states, decoder_states_stack,
+                enc_padding_mask, encoder_states, eti, state):
+    '''
+    Get context, attention and other information based on the use_intra_decoder_attention flag
+    :param use_intra_decoder_attention:
+        0, The base Pointer-Generate model only
+        1, concat with Intra-Decoder Attention,
+        2, Intra Attention (Intra Temporal + Intra Decoder),
+        3, Intra Temoral only (replace the base Pointer-Generate model)
+    :param attention:
+    :param coverage:
+    :param decoder_states:
+    :param decoder_states_stack:
+    :param enc_padding_mask:
+    :param encoder_states:
+    :param eti:
+    :param state:
+    :return:
+    '''
+    if use_intra_decoder_attention == 0:
+        context_vector, attn_dist, _ = attention(state, coverage)  # don't allow coverage to update
+        intra_context_vector = None
+    elif use_intra_decoder_attention == 1:
+        context_vector, attn_dist, _ = attention(state, coverage)  # don't allow coverage to update
+        intra_context_vector = intra_decoder_context(decoder_states_stack)
+    elif use_intra_decoder_attention == 2:
+        context_vector, attn_dist, = intra_temporal_context(decoder_states, encoder_states, eti, enc_padding_mask)
+        intra_context_vector = intra_decoder_context(decoder_states_stack)
+    elif use_intra_decoder_attention == 3:
+        context_vector, attn_dist, = intra_temporal_context(decoder_states, encoder_states, eti, enc_padding_mask)
+        intra_context_vector = None
+    return attn_dist, context_vector, intra_context_vector
 
 
 def linear(args, output_size, bias, bias_start=0.0, scope=None):
