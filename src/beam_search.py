@@ -149,7 +149,7 @@ def run_beam_search(sess, model, vocab, batch):
                     # put into Tri-Gram dictionary
                     for tri_id in current_tri_ids:
                         if tri_id in tri_gram_set:
-                            probs = 0.0 # update the probs
+                            probs = -1e+10 # update the probs
                         tri_gram_set.add(tri_id)
                 current_token_ids.append(current_token_id)
                 # End of for Tri-Gram repeat search
