@@ -22,6 +22,7 @@ import tensorflow as tf
 import data
 
 FLAGS = tf.app.flags.FLAGS
+MINIMUM_LOG_PROB = -1e+5
 
 
 class Hypothesis(object):
@@ -44,6 +45,7 @@ class Hypothesis(object):
         self.attn_dists = attn_dists
         self.p_gens = p_gens
         self.coverage = coverage
+        self.tri_grams = set()
 
     def extend(self, token, log_prob, state, attn_dist, p_gen, coverage):
         """Return a NEW hypothesis, extended with the information from the latest step of beam search.
@@ -58,6 +60,13 @@ class Hypothesis(object):
         Returns:
           New Hypothesis for next step.
         """
+        if len(self.tokens) > 2:
+            # add last tri-gram
+            self.tri_grams.add(tuple(self.tokens[-3:]))
+            # update current tri-gram log_prob
+            if tuple(self.tokens[-2:] + [token]) in self.tri_grams:
+                log_prob = MINIMUM_LOG_PROB
+
         return Hypothesis(tokens=self.tokens + [token],
                           log_probs=self.log_probs + [log_prob],
                           state=state,
@@ -108,8 +117,6 @@ def run_beam_search(sess, model, vocab, batch):
     results = []  # this will contain finished hypotheses (those that have emitted the [STOP] token)
 
     steps = 0
-    tri_gram_set = set()
-    oldest_token_ids, older_token_ids, current_token_ids = [], [], []
     while steps < FLAGS.max_dec_steps and len(results) < FLAGS.beam_size:
         latest_tokens = [h.latest_token for h in hyps]  # latest token produced by each hypothesis
         latest_tokens = [t if t in range(vocab.size()) else vocab.word2id(data.UNKNOWN_TOKEN) for t in
@@ -138,33 +145,14 @@ def run_beam_search(sess, model, vocab, batch):
 
             for j in range(FLAGS.beam_size * 2):  # for each of the top 2*beam_size hyps:
                 # Extend the ith hypothesis with the jth option
-                probs = topk_log_probs[i, j]
-                current_token_id = topk_ids[i, j]
-
-                # For Tri-Gram repeat search
-                if steps > 1:
-                    current_tri_ids = ["{}{}{}".format(oldest_token_id, older_token_id, current_token_id) \
-                                       for oldest_token_id in older_token_ids \
-                                       for older_token_id in older_token_ids]
-                    # put into Tri-Gram dictionary
-                    for tri_id in current_tri_ids:
-                        if tri_id in tri_gram_set:
-                            probs = -1e+10 # update the probs
-                        tri_gram_set.add(tri_id)
-                current_token_ids.append(current_token_id)
-                # End of for Tri-Gram repeat search
-
-                new_hyp = h.extend(token=current_token_id,
-                                   log_prob=probs,
+                new_hyp = h.extend(token=topk_ids[i, j],
+                                   log_prob=topk_log_probs[i, j],
                                    state=new_state,
                                    attn_dist=attn_dist,
                                    p_gen=p_gen,
                                    coverage=new_coverage_i)
 
                 all_hyps.append(new_hyp)
-
-            # update lists for Tri-Gram use
-            oldest_token_ids, older_token_ids = older_token_ids, current_token_ids
 
         # Filter and collect any hypotheses that have produced the end token.
         hyps = []  # will contain hypotheses for the next step
