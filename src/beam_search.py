@@ -137,7 +137,6 @@ def run_beam_search(sess, model, vocab, batch):
         num_orig_hyps = 1 if steps == 0 else len(
             hyps)  # On the first step, we only had one original hypothesis (the initial hypothesis). On subsequent steps, all original hypotheses are distinct.
 
-        current_token_ids = []
         for i in range(num_orig_hyps):
             h, new_state, attn_dist, p_gen, new_coverage_i = hyps[i], new_states[i], attn_dists[i], p_gens[i], \
                                                              new_coverage[
