@@ -172,7 +172,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
                 x = linear([inp] + [context_vector], input_size, True)
 
             # Run the decoder RNN cell. cell_output = decoder state
-            cell_output, state = cell(x, state)
+            cell_output, state = cell(inp, state)
 
             # Keep the decoder states
             decoder_states.append(state)
@@ -199,7 +199,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
             # Calculate p_gen
             if pointer_gen:
                 with tf.variable_scope('calculate_pgen'):
-                    p_gen = linear([context_vector, state.c, state.h, x], 1, True)  # a scalar
+                    p_gen = linear([context_vector, state.c, state.h, inp], 1, True)  # a scalar
                     p_gen = tf.sigmoid(p_gen)
                     p_gens.append(p_gen)
 
