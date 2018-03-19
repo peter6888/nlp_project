@@ -5,6 +5,9 @@ The attempt to replicate below paper.
 
 https://arxiv.org/abs/1705.04304
 
+## Open Source in GitHub
+https://github.com/peter6888/nlp_project 
+
 ## Download data
 Type the following with your current directory being our repository.
 ```
