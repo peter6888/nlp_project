@@ -1,7 +1,7 @@
 """intra_attention_decoder.py"""
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 # Modifications Copyright 2017 Abigail See
-# Modifications Copyright 2018 Stelios Serghiou, Peter Li, Apurva Pancholi
+# Modifications Copyright 2018 Team - Stelios Serghiou, Peter Li, Apurva Pancholi
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

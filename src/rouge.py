@@ -1,3 +1,5 @@
+# Created by CS224n team - Stelios Serghiou, Peter Li, Apurva Pancholi
+
 import os
 import sys
 

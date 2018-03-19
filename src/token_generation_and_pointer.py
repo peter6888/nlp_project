@@ -1,5 +1,6 @@
 '''
 token_generation_and_pointer.py
+# Created by CS224n team - Stelios Serghiou, Peter Li, Apurva Pancholi
 '''
 import tensorflow as tf
 import numpy as np
