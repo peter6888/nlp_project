@@ -97,7 +97,9 @@ Overleaf https://www.overleaf.com/read/hykvfpwrgvsj
 #### python 3.5.2 (or python 3.6.x)
 #### pyrouge
 Which is a perl based tool, and use pyrouge to call https://github.com/andersjo/pyrouge
+```
 git clone https://github.com/andersjo/pyrouge.git
+```
 edit ~/.pyrouge/settings.ini
 ```
 [pyrouge settings]
