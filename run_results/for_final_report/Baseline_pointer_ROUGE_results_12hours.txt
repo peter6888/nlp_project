@@ -1,0 +1,15 @@
+
+ROUGE-1:
+rouge_1_f_score: 0.2569 with confidence interval (0.2490, 0.2648)
+rouge_1_recall: 0.2890 with confidence interval (0.2796, 0.2987)
+rouge_1_precision: 0.2417 with confidence interval (0.2340, 0.2495)
+
+ROUGE-2:
+rouge_2_f_score: 0.0945 with confidence interval (0.0873, 0.1019)
+rouge_2_recall: 0.1073 with confidence interval (0.0990, 0.1159)
+rouge_2_precision: 0.0879 with confidence interval (0.0811, 0.0947)
+
+ROUGE-l:
+rouge_l_f_score: 0.2332 with confidence interval (0.2257, 0.2409)
+rouge_l_recall: 0.2628 with confidence interval (0.2533, 0.2725)
+rouge_l_precision: 0.2192 with confidence interval (0.2120, 0.2266)
