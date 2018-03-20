@@ -1,0 +1,23 @@
+====Reference 000759=====
+latest of 8 robberies came at wells fargo bank in falls church , virginia , during lunch hour .
+fbi : one robber white , the other black ; they 're in their 40s and stand about 5 ' 8 ''
+trio includes a driver who waits outside while other two take over bank , fbi says .
+=======intra_attention(intra_temporal + intra_decoder)_pointer===
+a bank robbery trio trio known as the black hat bandits suspected in a two-month string of robberies across maryland and virginia .
+the trio bandits suspected in a two-month string of robberies across maryland and virginia .
+the trio bandits suspected in a two-month string of robberies across maryland and virginia .
+====IntraDecode  + Pointer=====
+a $ 30,000 reward for information leading to the conviction of a bank robbery trio known as the black hat bandits have been described as the black hat bandits .
+the black hat bandits has been described as ` the black hat bandits , the black hat bandits have been described as carrying handguns and wearing winter coats , sunglasses , black hats and facial disguises such as ski masks or a fake beard .
+====IntraTemporal + Pointer=====
+the black hat bandits have become the black hat bandits bandits .
+the feds say they are becoming increasingly dangerous for the black hat bandits .
+the fbi says the robbers used the black hat bandits as well as the black hat bandits .
+====IntraTemporal 66704=====
+a bank bank bank robbery arrests a bank bank bank robbery three years ago .
+a bank bank bank robbery arrests a bank bank bank robbery .
+a bank bank bank robbery arrests a bank bank bank robbery .
+====IntraDecode 64926===
+the black hat bandits are suspected in a two-month string of robberies across maryland and virginia .
+the black hat bandits have been described as in their 40s and [UNK] .
+the black hat bandits have become more brazen at each robbery .
