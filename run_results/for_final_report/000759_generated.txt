@@ -21,3 +21,11 @@ a bank bank bank robbery arrests a bank bank bank robbery .
 the black hat bandits are suspected in a two-month string of robberies across maryland and virginia .
 the black hat bandits have been described as in their 40s and [UNK] .
 the black hat bandits have become more brazen at each robbery .
+====IntraAttention===
+a bank robbery trio suspect black men face a bank robber gang robberies in maryland bank robberies .
+the black black black men robbers stole a bank robbery trio in the black black black men bank robbery trio .
+the men stole a $ $ 30,000 bank bank bank robbery trio who stole the black black black men robbers .
+=======baseline=======
+the black hat bandits are suspected in a two-month string of robberies .
+the black hat bandits are suspected in a two-month string of robberies .
+the fbi says it 's a `` [UNK] crew '' and `` a fake beard ''
